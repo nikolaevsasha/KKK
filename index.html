@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Для Кати 💗</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+<meta name="theme-color" content="#ee9ca7">
+<meta property="og:title" content="Для Кати 💗">
+<meta property="og:description" content="Нажми на то, что чувствуешь — я рядом, даже отсюда">
+<meta property="og:image" content="https://katya.persashagrata.com/photos/og.jpg">
+<meta property="og:url" content="https://katya.persashagrata.com/">
+<meta property="og:type" content="website">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -246,6 +253,52 @@
     z-index: 10;
   }
   @keyframes fly { to { transform: translateY(-110vh) rotate(20deg); opacity: 0; } }
+
+  /* Заставка */
+  .splash {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #ffdde1 0%, #ee9ca7 50%, #ffc3a0 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    z-index: 100;
+    transition: opacity .8s ease;
+  }
+  .splash.hide { opacity: 0; pointer-events: none; }
+  .splash-heart {
+    font-size: 5rem;
+    animation: beat 1s ease-in-out infinite;
+  }
+  @keyframes beat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.25); }
+    40% { transform: scale(1); }
+    60% { transform: scale(1.15); }
+  }
+  .splash-text {
+    color: #7a2b3f;
+    font-size: 1.8rem;
+    font-weight: 600;
+    animation: pop .9s ease;
+  }
+
+  .sound-btn {
+    position: fixed;
+    right: 18px;
+    top: 18px;
+    border: none;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 1.15rem;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(122,43,63,0.25);
+    z-index: 20;
+  }
 </style>
 </head>
 <body>
@@ -275,6 +328,12 @@
     <div class="dots" id="dots"></div>
   </section>
 
+  <div class="splash" id="splash">
+    <div class="splash-heart">💗</div>
+    <div class="splash-text">Привет, Катя</div>
+  </div>
+
+  <button class="sound-btn" id="soundBtn" title="Звук">🔊</button>
   <button class="gift-btn" id="giftBtn" title="Что это тут такое?..">🎁</button>
 
   <div class="modal-bg" id="modalBg">
@@ -287,6 +346,60 @@
   </div>
 
 <script>
+// Заставка при открытии
+const splash = document.getElementById('splash');
+setTimeout(() => splash.classList.add('hide'), 2000);
+splash.addEventListener('click', () => splash.classList.add('hide'));
+
+// Уведомления Саше о нажатиях (через ntfy.sh)
+const NTFY_TOPIC = 'katya-sasha-serdechko-x8k2v9q4';
+function notify(text) {
+  fetch('https://ntfy.sh/' + NTFY_TOPIC, {
+    method: 'POST',
+    body: text,
+    headers: { 'Tags': 'heart' },
+  }).catch(() => {});
+}
+
+// Мягкие звуки через WebAudio
+let soundOn = localStorage.getItem('soundOn') !== '0';
+const soundBtn = document.getElementById('soundBtn');
+function renderSound() { soundBtn.textContent = soundOn ? '🔊' : '🔇'; }
+renderSound();
+soundBtn.addEventListener('click', () => {
+  soundOn = !soundOn;
+  localStorage.setItem('soundOn', soundOn ? '1' : '0');
+  renderSound();
+  if (soundOn) playPop();
+});
+let audioCtx;
+function playTone(freq, dur, delay, type = 'sine', vol = 0.12) {
+  const t = audioCtx.currentTime + delay;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function ensureCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playPop() {
+  if (!soundOn) return;
+  ensureCtx();
+  playTone(660, 0.12, 0);
+  playTone(880, 0.15, 0.06);
+}
+function playChime() {
+  if (!soundOn) return;
+  ensureCtx();
+  [523, 659, 784, 1047].forEach((f, i) => playTone(f, 0.35, i * 0.09, 'sine', 0.09));
+}
+
 const messages = {
   sad: [
     "Иди сюда, обниму крепко-крепко. Всё грустное — временно, а я — нет 💗",
@@ -384,6 +497,8 @@ document.querySelectorAll('.mood').forEach(btn => {
     html += `<div>${list[i]}</div>`;
     showCard(html);
     spawnHearts(mood === 'happy' ? 12 : 6);
+    mood === 'happy' ? playChime() : playPop();
+    notify(`Катя нажала: «${btn.textContent.trim()}»`);
   });
 });
 
@@ -400,6 +515,8 @@ document.getElementById('hugBtn').addEventListener('click', () => {
   renderHugs();
   showCard('Обнимаю тебя со всей силы! 🤗💗');
   spawnHearts(15);
+  playChime();
+  notify(`Катя отправила обнимашку 🤗 (всего: ${hugs})`);
 });
 
 function spawnHearts(n) {
@@ -490,6 +607,8 @@ function renderCoupons() {
       localStorage.setItem('usedCoupons', JSON.stringify([...usedCoupons]));
       renderCoupons();
       spawnHearts(12);
+      playChime();
+      notify(`Катя активировала купон: ${c.title} ${c.icon}`);
     });
     div.appendChild(btn);
     couponList.appendChild(div);
