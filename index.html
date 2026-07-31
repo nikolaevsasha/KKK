@@ -996,9 +996,13 @@ async function initPlayer() {
     listEl.appendChild(b);
   });
 
+  let knownDuration = 0;
   function load(i) {
     cur = (i + tracks.length) % tracks.length;
     audio.src = 'music/' + tracks[cur].file;
+    audio.preload = 'metadata';
+    knownDuration = 0;
+    progress.value = 0;
     nowEl.textContent = tracks[cur].title || tracks[cur].file;
     [...listEl.children].forEach((el, j) => el.classList.toggle('playing', j === cur));
   }
@@ -1009,12 +1013,36 @@ async function initPlayer() {
   document.getElementById('prevTrack').addEventListener('click', () => { load(cur - 1); play(); });
   document.getElementById('nextTrack').addEventListener('click', () => { load(cur + 1); play(); });
   audio.addEventListener('ended', () => { load(cur + 1); play(); });
+
+  // если браузер не знает длительность (Infinity у некоторых mp3),
+  // заставляем его домотать до конца и вернуться: после этого длительность известна
+  audio.addEventListener('loadedmetadata', () => {
+    if (audio.duration === Infinity || isNaN(audio.duration)) {
+      const onDur = () => {
+        if (isFinite(audio.duration) && audio.duration > 0) {
+          knownDuration = audio.duration;
+          audio.currentTime = 0;
+          audio.removeEventListener('durationchange', onDur);
+        }
+      };
+      audio.addEventListener('durationchange', onDur);
+      audio.currentTime = 1e101;
+    } else {
+      knownDuration = audio.duration;
+    }
+  });
+
+  // не обновляем ползунок, пока Катя его тащит
+  let seeking = false;
   audio.addEventListener('timeupdate', () => {
-    if (audio.duration) progress.value = (audio.currentTime / audio.duration) * 100;
+    if (!seeking && knownDuration) progress.value = (audio.currentTime / knownDuration) * 100;
   });
-  progress.addEventListener('input', () => {
-    if (audio.duration) audio.currentTime = (progress.value / 100) * audio.duration;
-  });
+  const doSeek = () => {
+    if (knownDuration) audio.currentTime = (progress.value / 100) * knownDuration;
+  };
+  ['pointerdown', 'touchstart'].forEach(e => progress.addEventListener(e, () => { seeking = true; }));
+  ['pointerup', 'touchend'].forEach(e => progress.addEventListener(e, () => { doSeek(); seeking = false; }));
+  progress.addEventListener('change', () => { doSeek(); seeking = false; });
   load(0);
 }
 initPlayer();
