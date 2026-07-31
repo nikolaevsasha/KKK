@@ -254,6 +254,117 @@
   }
   @keyframes fly { to { transform: translateY(-110vh) rotate(20deg); opacity: 0; } }
 
+  /* Причины */
+  .reasons {
+    margin-top: 44px;
+    width: 100%;
+    max-width: 560px;
+  }
+  .reasons h2 { color: #7a2b3f; text-align: center; margin-bottom: 16px; font-size: 1.4rem; }
+  .reason {
+    background: rgba(255,255,255,0.85);
+    border-radius: 16px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    color: #6b2437;
+    font-size: 1rem;
+    line-height: 1.4;
+    box-shadow: 0 4px 14px rgba(122,43,63,0.15);
+  }
+  .footer-line {
+    margin-top: 40px;
+    color: #a04a5e;
+    font-size: .95rem;
+    text-align: center;
+  }
+
+  /* Мини-игра */
+  .game-btn {
+    margin-top: 14px;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 28px;
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    background: rgba(255,255,255,0.85);
+    color: #7a2b3f;
+    box-shadow: 0 4px 14px rgba(122,43,63,0.2);
+    transition: transform .15s ease;
+  }
+  .game-btn:hover { transform: scale(1.05); }
+  .game-bg {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(160deg, #ffe3e8, #ffd1dc);
+    display: none;
+    z-index: 40;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+  .game-bg.open { display: block; }
+  .game-hud {
+    position: absolute;
+    top: 14px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    color: #7a2b3f;
+    font-size: 1.15rem;
+    font-weight: 600;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .game-exit {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    border: none;
+    background: rgba(255,255,255,0.8);
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    font-size: 1rem;
+    cursor: pointer;
+    z-index: 4;
+  }
+  .game-heart {
+    position: absolute;
+    top: -60px;
+    animation: fall linear forwards;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    z-index: 2;
+  }
+  @keyframes fall { to { transform: translateY(118vh); } }
+  .game-end {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 5;
+    color: #7a2b3f;
+    text-align: center;
+    background: rgba(255,247,248,0.9);
+    font-size: 1.2rem;
+    padding: 20px;
+  }
+  .game-end.show { display: flex; }
+  .game-end button {
+    border: none;
+    border-radius: 999px;
+    padding: 12px 28px;
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    background: #d64d6e;
+    color: #fff;
+  }
+
   /* Заставка */
   .splash {
     position: fixed;
@@ -318,6 +429,15 @@
 
   <button class="hug-btn" id="hugBtn">Обнять 🤗</button>
   <div class="hug-count" id="hugCount"></div>
+  <button class="game-btn" id="gameBtn">Поймай сердечки 🎮</button>
+
+  <section class="reasons">
+    <h2>Почему я тебя люблю 💘</h2>
+    <div class="reason">Ты компактная — идеально помещаешься в мои объятия. Проверено тысячу раз 📏🤗</div>
+    <div class="reason">Ты моя личная перемога 🇺🇦💗</div>
+    <div class="reason">С тобой даже понедельник звучит как любимый трек 🎸</div>
+    <div class="reason">Твой смех — мой любимый звук на свете. Громче любого концерта 🔊</div>
+  </section>
 
   <section class="gallery" id="gallery">
     <h2>Мы с тобой 📸</h2>
@@ -327,6 +447,17 @@
     </div>
     <div class="dots" id="dots"></div>
   </section>
+
+  <p class="footer-line">Слава Україні! 🇺🇦 · Зроблено з коханням для Каті</p>
+
+  <div class="game-bg" id="gameBg">
+    <div class="game-hud"><span id="gameScore">💗 0</span><span id="gameTime">⏱ 30</span></div>
+    <button class="game-exit" id="gameExit">✕</button>
+    <div class="game-end" id="gameEnd">
+      <div id="gameEndText"></div>
+      <button id="gameAgain">Ещё раз 🎮</button>
+    </div>
+  </div>
 
   <div class="splash" id="splash">
     <div class="splash-heart">💗</div>
@@ -499,6 +630,7 @@ document.querySelectorAll('.mood').forEach(btn => {
     showCard(html);
     spawnHearts(mood === 'happy' ? 12 : 6);
     mood === 'happy' ? playChime() : playPop();
+    maybeMeme();
     notify(`Катя нажала: «${btn.textContent.trim()}»`);
   });
 });
@@ -517,6 +649,7 @@ document.getElementById('hugBtn').addEventListener('click', () => {
   showCard('Обнимаю тебя со всей силы! 🤗💗');
   spawnHearts(15);
   playChime();
+  maybeMeme(0.5);
   notify(`Катя отправила обнимашку 🤗 (всего: ${hugs})`);
 });
 
@@ -620,6 +753,107 @@ document.getElementById('giftBtn').addEventListener('click', () => {
   renderCoupons();
   modalBg.classList.add('open');
 });
+
+// --- Вылетающие мемы (photos/meme1.jpg, meme2.jpg, ...) ---
+let memes = [];
+discover('meme', 30).then(list => { memes = list; });
+
+function maybeMeme(chance = 0.35) {
+  if (!memes.length || Math.random() > chance) return;
+  const img = document.createElement('img');
+  img.src = memes[Math.floor(Math.random() * memes.length)];
+  const fromLeft = Math.random() < 0.5;
+  Object.assign(img.style, {
+    position: 'fixed',
+    top: (15 + Math.random() * 50) + 'vh',
+    left: fromLeft ? '-45vw' : '105vw',
+    width: 'min(60vw, 300px)',
+    borderRadius: '18px',
+    boxShadow: '0 10px 30px rgba(80,20,35,0.4)',
+    zIndex: 25,
+    transition: 'transform 4s ease-in-out',
+    transform: 'translateX(0) rotate(' + (Math.random() * 20 - 10) + 'deg)',
+    cursor: 'pointer',
+  });
+  document.body.appendChild(img);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    img.style.transform = 'translateX(' + (fromLeft ? '160vw' : '-160vw') + ') rotate(' + (Math.random() * 30 - 15) + 'deg)';
+  }));
+  img.addEventListener('click', () => img.remove());
+  setTimeout(() => img.remove(), 4200);
+}
+
+// --- Мини-игра «Поймай сердечки» ---
+const gameBg = document.getElementById('gameBg');
+const gameScoreEl = document.getElementById('gameScore');
+const gameTimeEl = document.getElementById('gameTime');
+const gameEnd = document.getElementById('gameEnd');
+const gameEndText = document.getElementById('gameEndText');
+const GAME_SECONDS = 30;
+let gScore = 0, gTime = 0, gSpawn = null, gTick = null;
+
+function startGame() {
+  gScore = 0; gTime = GAME_SECONDS;
+  gameEnd.classList.remove('show');
+  gameBg.querySelectorAll('.game-heart').forEach(h => h.remove());
+  gameScoreEl.textContent = '💗 0';
+  gameTimeEl.textContent = '⏱ ' + gTime;
+  gameBg.classList.add('open');
+  gSpawn = setInterval(spawnGameHeart, 520);
+  gTick = setInterval(() => {
+    gTime--;
+    gameTimeEl.textContent = '⏱ ' + gTime;
+    if (gTime <= 0) finishGame();
+  }, 1000);
+}
+
+function spawnGameHeart() {
+  const h = document.createElement('div');
+  h.className = 'game-heart';
+  h.textContent = ['💗','💖','💘','🩷'][Math.floor(Math.random() * 4)];
+  h.style.left = (5 + Math.random() * 85) + 'vw';
+  h.style.fontSize = (26 + Math.random() * 26) + 'px';
+  h.style.animationDuration = (2.4 + Math.random() * 1.8) + 's';
+  h.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    gScore++;
+    gameScoreEl.textContent = '💗 ' + gScore;
+    playPop();
+    h.textContent = '✨';
+    h.style.pointerEvents = 'none';
+    setTimeout(() => h.remove(), 150);
+  });
+  h.addEventListener('animationend', () => h.remove());
+  gameBg.appendChild(h);
+}
+
+function finishGame() {
+  clearInterval(gSpawn); clearInterval(gTick);
+  gameBg.querySelectorAll('.game-heart').forEach(h => h.remove());
+  const record = Number(localStorage.getItem('gameRecord') || 0);
+  let text = `Ты поймала ${gScore} сердечек! 💗`;
+  if (gScore > record) {
+    localStorage.setItem('gameRecord', gScore);
+    text += '<br>Новый рекорд! 🏆';
+    notify(`Катя поставила рекорд в игре: ${gScore} сердечек! 🏆`);
+  } else if (record) {
+    text += `<br>Рекорд: ${record}`;
+  }
+  gameEndText.innerHTML = text;
+  gameEnd.classList.add('show');
+  playChime();
+}
+
+function closeGame() {
+  clearInterval(gSpawn); clearInterval(gTick);
+  gameBg.classList.remove('open');
+  gameEnd.classList.remove('show');
+  gameBg.querySelectorAll('.game-heart').forEach(h => h.remove());
+}
+
+document.getElementById('gameBtn').addEventListener('click', () => { startGame(); notify('Катя играет в «Поймай сердечки» 🎮'); });
+document.getElementById('gameAgain').addEventListener('click', startGame);
+document.getElementById('gameExit').addEventListener('click', closeGame);
 document.getElementById('closeModal').addEventListener('click', () => modalBg.classList.remove('open'));
 modalBg.addEventListener('click', e => { if (e.target === modalBg) modalBg.classList.remove('open'); });
 </script>
