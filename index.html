@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#ee9ca7">
 <meta property="og:title" content="Для Кати">
 <meta property="og:description" content="Маленький сайт для Каті">
-<meta property="og:image" content="https://katya.persashagrata.com/photos/og.jpg">
+<meta property="og:image" content="https://katya.persashagrata.com/photos/IMG_3792.JPEG">
 <meta property="og:url" content="https://katya.persashagrata.com/">
 <meta property="og:type" content="website">
 <style>
@@ -576,6 +576,13 @@ const messages = {
 const EXTS = ['jpg', 'jpeg', 'png', 'webp'];
 const MAX_PROBE = 30;
 
+// Основной источник — photos/manifest.json; поиск по именам остаётся запасным
+let manifest = null;
+const manifestReady = fetch('photos/manifest.json')
+  .then(r => r.ok ? r.json() : null)
+  .then(m => { manifest = m; })
+  .catch(() => {});
+
 function probeImage(base) {
   return new Promise(resolve => {
     let i = 0;
@@ -669,7 +676,13 @@ function spawnHearts(n) {
 
 // --- Слайдшоу галереи ---
 async function initGallery() {
-  const urls = await discover('gallery', MAX_PROBE);
+  await manifestReady;
+  let urls;
+  if (manifest && manifest.gallery && manifest.gallery.length) {
+    urls = manifest.gallery.map(f => 'photos/' + f);
+  } else {
+    urls = await discover('gallery', MAX_PROBE);
+  }
   if (!urls.length) return;
   const gallery = document.getElementById('gallery');
   const frame = document.getElementById('frame');
@@ -677,7 +690,8 @@ async function initGallery() {
   gallery.style.display = 'flex';
   const imgs = urls.map((u, idx) => {
     const img = document.createElement('img');
-    img.src = u;
+    img.dataset.src = u;
+    img.decoding = 'async';
     if (idx === 0) img.classList.add('active');
     frame.appendChild(img);
     const d = document.createElement('span');
@@ -686,11 +700,16 @@ async function initGallery() {
     dots.appendChild(d);
     return img;
   });
+  function ensure(idx) {
+    const im = imgs[(idx + imgs.length) % imgs.length];
+    if (!im.src) im.src = im.dataset.src;
+  }
   let cur = 0, timer;
   function show(idx) {
     imgs[cur].classList.remove('active');
     dots.children[cur].classList.remove('on');
     cur = (idx + imgs.length) % imgs.length;
+    ensure(cur); ensure(cur + 1); ensure(cur - 1);
     imgs[cur].classList.add('active');
     dots.children[cur].classList.add('on');
     restart();
@@ -701,12 +720,22 @@ async function initGallery() {
   }
   document.getElementById('prevBtn').addEventListener('click', () => show(cur - 1));
   document.getElementById('nextBtn').addEventListener('click', () => show(cur + 1));
+  ensure(0); ensure(1);
   restart();
 }
 
 async function initMoodPhotos() {
+  await manifestReady;
+  const all = (manifest && manifest.gallery) ? manifest.gallery.map(f => 'photos/' + f) : [];
   for (const mood of Object.keys(messages)) {
-    moodPhotos[mood] = await discover(mood, 10);
+    const fromManifest = manifest && manifest.moods && manifest.moods[mood];
+    if (fromManifest && fromManifest.length) {
+      moodPhotos[mood] = fromManifest.map(f => 'photos/' + f);
+    } else {
+      const probed = await discover(mood, 10);
+      // если именованных фото нет — берём случайные из общей галереи
+      moodPhotos[mood] = probed.length ? probed : all;
+    }
   }
 }
 
@@ -756,7 +785,13 @@ document.getElementById('giftBtn').addEventListener('click', () => {
 
 // --- Вылетающие мемы (photos/meme1.jpg, meme2.jpg, ...) ---
 let memes = [];
-discover('meme', 30).then(list => { memes = list; });
+manifestReady.then(async () => {
+  if (manifest && manifest.memes && manifest.memes.length) {
+    memes = manifest.memes.map(f => 'photos/' + f);
+  } else {
+    memes = await discover('meme', 30);
+  }
+});
 
 function maybeMeme(chance = 0.35) {
   if (!memes.length || Math.random() > chance) return;
