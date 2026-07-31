@@ -722,7 +722,7 @@ document.querySelectorAll('.mood').forEach(btn => {
     showCard(html);
     spawnHearts(mood === 'happy' ? 12 : 6);
     mood === 'happy' ? playChime() : playPop();
-    maybeMeme();
+    maybeMeme(0.5, mood);
     notify(`Катя нажала: «${btn.textContent.trim()}»`);
   });
 });
@@ -878,10 +878,25 @@ manifestReady.then(async () => {
   }
 });
 
-function maybeMeme(chance = 0.35) {
+// мемы, подходящие под настроение (по ключевым словам в имени файла)
+const memeMoodKeys = {
+  sad: ['support', 'cute'],
+  tired: ['hard-day', 'good-morning'],
+  angry: ['excuse-me', 'weird'],
+  miss: ['dog', 'wedding'],
+  anxious: ['confused', 'forgetful', 'support'],
+  happy: ['happy', 'super-cute', 'good-morning'],
+};
+
+function maybeMeme(chance = 0.35, mood = null) {
   if (!memes.length || Math.random() > chance) return;
+  let pool = memes;
+  if (mood && memeMoodKeys[mood]) {
+    const matched = memes.filter(u => memeMoodKeys[mood].some(k => u.includes(k)));
+    if (matched.length) pool = matched;
+  }
   const img = document.createElement('img');
-  img.src = memes[Math.floor(Math.random() * memes.length)];
+  img.src = pool[Math.floor(Math.random() * pool.length)];
   const fromLeft = Math.random() < 0.5;
   Object.assign(img.style, {
     position: 'fixed',
