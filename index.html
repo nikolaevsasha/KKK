@@ -663,7 +663,7 @@ const MAX_PROBE = 30;
 
 // Основной источник — photos/manifest.json; поиск по именам остаётся запасным
 let manifest = null;
-const manifestReady = fetch('photos/manifest.json')
+const manifestReady = fetch('photos/manifest.json?v=' + Date.now(), { cache: 'no-store' })
   .then(r => r.ok ? r.json() : null)
   .then(m => { manifest = m; })
   .catch(() => {});
@@ -990,7 +990,7 @@ function closeGame() {
 async function initPlayer() {
   let tracks = [];
   try {
-    const r = await fetch('music/manifest.json');
+    const r = await fetch('music/manifest.json?v=' + Date.now(), { cache: 'no-store' });
     if (r.ok) tracks = await r.json();
   } catch {}
   if (!tracks.length) return;
