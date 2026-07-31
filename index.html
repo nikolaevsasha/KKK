@@ -151,6 +151,92 @@
   }
   .dots span.on { background: #d64d6e; }
 
+  /* Секретная кнопка-подарок и купоны */
+  .gift-btn {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    border: none;
+    background: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    width: 54px;
+    height: 54px;
+    font-size: 1.6rem;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(122,43,63,0.3);
+    z-index: 20;
+    transition: transform .15s ease;
+    animation: wiggle 3s ease-in-out infinite;
+  }
+  .gift-btn:hover { transform: scale(1.12); }
+  @keyframes wiggle {
+    0%, 90%, 100% { transform: rotate(0); }
+    92% { transform: rotate(-8deg); }
+    94% { transform: rotate(8deg); }
+    96% { transform: rotate(-6deg); }
+    98% { transform: rotate(6deg); }
+  }
+  .modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(80,20,35,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    padding: 20px;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: #fff7f8;
+    border-radius: 24px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 26px 22px;
+    box-shadow: 0 12px 40px rgba(80,20,35,0.4);
+    animation: pop .3s ease;
+  }
+  .modal h2 { color: #7a2b3f; text-align: center; margin-bottom: 6px; }
+  .modal .hint { color: #a04a5e; text-align: center; font-size: .92rem; margin-bottom: 18px; }
+  .coupon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #fff;
+    border: 2px dashed #e8a2b3;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .coupon.used { opacity: .55; border-style: solid; }
+  .coupon .txt { color: #6b2437; font-size: 1rem; line-height: 1.35; }
+  .coupon .txt small { display: block; color: #a04a5e; margin-top: 2px; }
+  .coupon button {
+    border: none;
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-family: inherit;
+    font-size: .9rem;
+    cursor: pointer;
+    background: #d64d6e;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .coupon.used button { background: #b8a0a6; cursor: default; }
+  .modal .close {
+    display: block;
+    margin: 8px auto 0;
+    border: none;
+    background: none;
+    color: #a04a5e;
+    font-family: inherit;
+    font-size: .95rem;
+    cursor: pointer;
+    text-decoration: underline;
+  }
   .heart {
     position: fixed;
     bottom: -30px;
@@ -188,6 +274,17 @@
     </div>
     <div class="dots" id="dots"></div>
   </section>
+
+  <button class="gift-btn" id="giftBtn" title="Что это тут такое?..">🎁</button>
+
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <h2>Купоны для Кати 🎟️</h2>
+      <p class="hint">Каждый купон можно активировать один раз. Активировала — покажи Саше, он обязан исполнить 😄</p>
+      <div id="couponList"></div>
+      <button class="close" id="closeModal">закрыть</button>
+    </div>
+  </div>
 
 <script>
 const messages = {
@@ -364,6 +461,47 @@ async function initMoodPhotos() {
 
 initGallery();
 initMoodPhotos();
+
+// --- Купоны ---
+const coupons = [
+  { id: 'hug',     icon: '🤗', title: 'Купон на бесконечные обнимашки', note: 'действует весь день' },
+  { id: 'massage', icon: '💆‍♀️', title: 'Купон на массаж', note: 'минимум 20 минут, без отговорок' },
+  { id: 'dinner',  icon: '🍝', title: 'Купон на ужин', note: 'ресторан или готовит Саша — выбираешь ты' },
+  { id: 'movie',   icon: '🎬', title: 'Купон на вечер кино', note: 'фильм выбираешь ты, плед и вкусняшки с меня' },
+  { id: 'walk',    icon: '🌆', title: 'Купон на прогулку', note: 'куда захочешь, хоть под дождём' },
+  { id: 'wish',    icon: '🪄', title: 'Купон на одно любое желание', note: 'в разумных пределах... ладно, в любых' },
+];
+
+const modalBg = document.getElementById('modalBg');
+const couponList = document.getElementById('couponList');
+const usedCoupons = new Set(JSON.parse(localStorage.getItem('usedCoupons') || '[]'));
+
+function renderCoupons() {
+  couponList.innerHTML = '';
+  coupons.forEach(c => {
+    const used = usedCoupons.has(c.id);
+    const div = document.createElement('div');
+    div.className = 'coupon' + (used ? ' used' : '');
+    div.innerHTML = `<div class="txt">${c.icon} <b>${c.title}</b><small>${c.note}</small></div>`;
+    const btn = document.createElement('button');
+    btn.textContent = used ? 'Активирован ✔' : 'Активировать';
+    if (!used) btn.addEventListener('click', () => {
+      usedCoupons.add(c.id);
+      localStorage.setItem('usedCoupons', JSON.stringify([...usedCoupons]));
+      renderCoupons();
+      spawnHearts(12);
+    });
+    div.appendChild(btn);
+    couponList.appendChild(div);
+  });
+}
+
+document.getElementById('giftBtn').addEventListener('click', () => {
+  renderCoupons();
+  modalBg.classList.add('open');
+});
+document.getElementById('closeModal').addEventListener('click', () => modalBg.classList.remove('open'));
+modalBg.addEventListener('click', e => { if (e.target === modalBg) modalBg.classList.remove('open'); });
 </script>
 </body>
 </html>
