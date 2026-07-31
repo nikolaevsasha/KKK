@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кнопка для тебя 💗</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #ffdde1 0%, #ee9ca7 50%, #ffc3a0 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow-x: hidden;
+  }
+  h1 {
+    color: #7a2b3f;
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    color: #a04a5e;
+    text-align: center;
+    margin-bottom: 28px;
+    font-size: 1.05rem;
+  }
+  .buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    width: 100%;
+    max-width: 560px;
+    margin-bottom: 28px;
+  }
+  button.mood {
+    border: none;
+    border-radius: 18px;
+    padding: 18px 12px;
+    font-size: 1.05rem;
+    font-family: inherit;
+    cursor: pointer;
+    background: rgba(255,255,255,0.85);
+    color: #7a2b3f;
+    box-shadow: 0 4px 14px rgba(122,43,63,0.18);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  button.mood:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 8px 20px rgba(122,43,63,0.25); }
+  button.mood:active { transform: scale(0.96); }
+  .card {
+    background: rgba(255,255,255,0.92);
+    border-radius: 22px;
+    padding: 26px 30px;
+    max-width: 560px;
+    width: 100%;
+    min-height: 110px;
+    text-align: center;
+    color: #6b2437;
+    font-size: 1.15rem;
+    line-height: 1.5;
+    box-shadow: 0 8px 30px rgba(122,43,63,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pop .3s ease;
+  }
+  @keyframes pop { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .hug-btn {
+    margin-top: 22px;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 34px;
+    font-size: 1.1rem;
+    font-family: inherit;
+    cursor: pointer;
+    background: #d64d6e;
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(214,77,110,0.4);
+    transition: transform .15s ease;
+  }
+  .hug-btn:hover { transform: scale(1.05); }
+  .hug-count { margin-top: 10px; color: #a04a5e; font-size: .95rem; }
+  .heart {
+    position: fixed;
+    bottom: -30px;
+    font-size: 24px;
+    animation: fly 3.5s linear forwards;
+    pointer-events: none;
+    z-index: 10;
+  }
+  @keyframes fly {
+    to { transform: translateY(-110vh) rotate(20deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <h1>Привет, солнышко 🌸</h1>
+  <p class="subtitle">Нажми на то, что чувствуешь — я рядом, даже отсюда</p>
+
+  <div class="buttons">
+    <button class="mood" data-mood="sad">Мне грустно 🥺</button>
+    <button class="mood" data-mood="tired">Я устала 😮‍💨</button>
+    <button class="mood" data-mood="angry">Я злюсь 😤</button>
+    <button class="mood" data-mood="miss">Скучаю 💭</button>
+    <button class="mood" data-mood="anxious">Тревожно 🫨</button>
+    <button class="mood" data-mood="happy">Мне хорошо ☀️</button>
+  </div>
+
+  <div class="card" id="card">Я тут. Выбирай кнопку 💗</div>
+
+  <button class="hug-btn" id="hugBtn">Обнять 🤗</button>
+  <div class="hug-count" id="hugCount"></div>
+
+<script>
+const messages = {
+  sad: [
+    "Иди сюда, обниму крепко-крепко. Всё грустное — временно, а я — нет 💗",
+    "Ты самая замечательная, даже когда грустишь. Позвони мне, если хочешь 📞",
+    "Помнишь, как мы смеялись до слёз? Скоро будет ещё столько таких моментов ✨",
+    "Грусть пройдёт, а ты останешься прекрасной. Я тебя люблю 💌",
+  ],
+  tired: [
+    "Ты столько всего тянешь — ты у меня герой. Отдохни, ты это заслужила 🛋️",
+    "Завернись в плед, поставь любимый сериал. Мир подождёт 🌙",
+    "Устала — значит, старалась. Горжусь тобой. А теперь — отдыхать! 😴",
+    "Представь: я глажу тебя по голове и говорю, что всё сделаем вместе 🥰",
+  ],
+  angry: [
+    "Позлись, имеешь полное право! А потом иди сюда — обниму 😤➡️🤗",
+    "Кто тебя обидел? Скажи — пойдём разбираться вместе 🥊",
+    "Ты красивая, даже когда злишься. Особенно когда злишься 😏",
+    "Выдохни. Вдохни. Ещё раз. А теперь вспомни, что я тебя обожаю 💗",
+  ],
+  miss: [
+    "А я по тебе скучаю ещё сильнее. Проверено, измерено, доказано 📏💘",
+    "Закрой глаза — я мысленно уже рядом и держу тебя за руку 🫶",
+    "Скоро увидимся, и я тебя не отпущу минимум час 🤗",
+    "Напиши мне прямо сейчас! Я жду твоё сообщение 📱",
+  ],
+  anxious: [
+    "Всё будет хорошо. А если не будет — разберёмся вместе, ты не одна 🤝",
+    "Дыши со мной: вдох на 4, задержка на 4, выдох на 4. Ты справишься 🌬️",
+    "Тревога врёт. А я говорю правду: ты умница и всё получится 💪",
+    "Положи руку на сердце. Чувствуешь? Оно бьётся, и я его очень люблю 💓",
+  ],
+  happy: [
+    "Ура! Твоя улыбка — моё любимое явление природы ☀️",
+    "Когда тебе хорошо — мне тоже хорошо. Такая вот система 🥰",
+    "Запомни этот момент! И расскажи мне про него потом 💬",
+    "Ты сияешь! Так и продолжай, моя хорошая ✨",
+  ],
+};
+
+const card = document.getElementById('card');
+const lastShown = {};
+
+document.querySelectorAll('.mood').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mood = btn.dataset.mood;
+    const list = messages[mood];
+    let i;
+    do { i = Math.floor(Math.random() * list.length); } while (list.length > 1 && i === lastShown[mood]);
+    lastShown[mood] = i;
+    card.style.animation = 'none';
+    void card.offsetWidth;
+    card.style.animation = '';
+    card.textContent = list[i];
+    spawnHearts(mood === 'happy' ? 12 : 6);
+  });
+});
+
+let hugs = Number(localStorage.getItem('hugs') || 0);
+const hugCount = document.getElementById('hugCount');
+function renderHugs() {
+  hugCount.textContent = hugs ? `Обнимашек получено: ${hugs} 🤍` : '';
+}
+renderHugs();
+
+document.getElementById('hugBtn').addEventListener('click', () => {
+  hugs++;
+  localStorage.setItem('hugs', hugs);
+  renderHugs();
+  card.style.animation = 'none';
+  void card.offsetWidth;
+  card.style.animation = '';
+  card.textContent = 'Обнимаю тебя со всей силы! 🤗💗';
+  spawnHearts(15);
+});
+
+function spawnHearts(n) {
+  const emojis = ['💗','💖','💘','🩷','✨','🌸'];
+  for (let k = 0; k < n; k++) {
+    const h = document.createElement('div');
+    h.className = 'heart';
+    h.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    h.style.left = Math.random() * 100 + 'vw';
+    h.style.animationDelay = (Math.random() * 0.8) + 's';
+    h.style.fontSize = (18 + Math.random() * 20) + 'px';
+    document.body.appendChild(h);
+    setTimeout(() => h.remove(), 4500);
+  }
+}
+</script>
+</body>
+</html>
