@@ -365,6 +365,82 @@
     color: #fff;
   }
 
+  /* Плеер */
+  .player {
+    display: none;
+    margin-top: 44px;
+    width: 100%;
+    max-width: 560px;
+    background: rgba(255,255,255,0.92);
+    border-radius: 22px;
+    padding: 20px 22px;
+    box-shadow: 0 8px 30px rgba(122,43,63,0.2);
+    flex-direction: column;
+    gap: 12px;
+  }
+  .player h2 { color: #7a2b3f; font-size: 1.4rem; text-align: center; }
+  .player-now {
+    color: #6b2437;
+    text-align: center;
+    font-size: 1.05rem;
+    min-height: 1.4em;
+  }
+  .player-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 18px;
+  }
+  .player-controls button {
+    border: none;
+    border-radius: 50%;
+    width: 46px;
+    height: 46px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    background: #fff;
+    color: #7a2b3f;
+    box-shadow: 0 3px 10px rgba(122,43,63,0.2);
+  }
+  .player-controls .play {
+    width: 58px;
+    height: 58px;
+    background: #d64d6e;
+    color: #fff;
+    font-size: 1.3rem;
+  }
+  .player-progress {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #f3cdd6;
+    outline: none;
+    cursor: pointer;
+  }
+  .player-progress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #d64d6e;
+    cursor: pointer;
+  }
+  .player-list { display: flex; flex-direction: column; gap: 6px; }
+  .player-track {
+    border: none;
+    background: none;
+    text-align: left;
+    font-family: inherit;
+    font-size: .98rem;
+    color: #6b2437;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .player-track:hover { background: #ffeef2; }
+  .player-track.playing { background: #ffe0e8; font-weight: 600; }
+
   /* Заставка */
   .splash {
     position: fixed;
@@ -445,6 +521,19 @@
       <button class="nav next" id="nextBtn">›</button>
     </div>
     <div class="dots" id="dots"></div>
+  </section>
+
+  <section class="player" id="player">
+    <h2>Наша музыка</h2>
+    <div class="player-now" id="playerNow"></div>
+    <input type="range" class="player-progress" id="playerProgress" value="0" min="0" max="100" step="0.1">
+    <div class="player-controls">
+      <button id="prevTrack">⏮</button>
+      <button class="play" id="playPause">▶</button>
+      <button id="nextTrack">⏭</button>
+    </div>
+    <div class="player-list" id="playerList"></div>
+    <audio id="audio"></audio>
   </section>
 
   <p class="footer-line">Слава Україні! · Зроблено з коханням для Каті</p>
@@ -885,6 +974,54 @@ function closeGame() {
   gameEnd.classList.remove('show');
   gameBg.querySelectorAll('.game-heart').forEach(h => h.remove());
 }
+
+// --- Музыкальный плеер (music/manifest.json: [{"file": "...", "title": "..."}]) ---
+async function initPlayer() {
+  let tracks = [];
+  try {
+    const r = await fetch('music/manifest.json');
+    if (r.ok) tracks = await r.json();
+  } catch {}
+  if (!tracks.length) return;
+  const player = document.getElementById('player');
+  const audio = document.getElementById('audio');
+  const nowEl = document.getElementById('playerNow');
+  const listEl = document.getElementById('playerList');
+  const playBtn = document.getElementById('playPause');
+  const progress = document.getElementById('playerProgress');
+  player.style.display = 'flex';
+  let cur = 0;
+
+  tracks.forEach((t, i) => {
+    const b = document.createElement('button');
+    b.className = 'player-track';
+    b.textContent = t.title || t.file;
+    b.addEventListener('click', () => { load(i); play(); });
+    listEl.appendChild(b);
+  });
+
+  function load(i) {
+    cur = (i + tracks.length) % tracks.length;
+    audio.src = 'music/' + tracks[cur].file;
+    nowEl.textContent = tracks[cur].title || tracks[cur].file;
+    [...listEl.children].forEach((el, j) => el.classList.toggle('playing', j === cur));
+  }
+  function play() { audio.play(); playBtn.textContent = '⏸'; }
+  function pause() { audio.pause(); playBtn.textContent = '▶'; }
+
+  playBtn.addEventListener('click', () => audio.paused ? play() : pause());
+  document.getElementById('prevTrack').addEventListener('click', () => { load(cur - 1); play(); });
+  document.getElementById('nextTrack').addEventListener('click', () => { load(cur + 1); play(); });
+  audio.addEventListener('ended', () => { load(cur + 1); play(); });
+  audio.addEventListener('timeupdate', () => {
+    if (audio.duration) progress.value = (audio.currentTime / audio.duration) * 100;
+  });
+  progress.addEventListener('input', () => {
+    if (audio.duration) audio.currentTime = (progress.value / 100) * audio.duration;
+  });
+  load(0);
+}
+initPlayer();
 
 document.getElementById('gameBtn').addEventListener('click', () => { startGame(); notify('Катя играет в «Поймай сердечки» 🎮'); });
 document.getElementById('gameAgain').addEventListener('click', startGame);
