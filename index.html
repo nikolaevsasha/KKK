@@ -904,7 +904,7 @@ function maybeMeme(chance = 0.35, mood = null) {
     borderRadius: '18px',
     boxShadow: '0 10px 30px rgba(80,20,35,0.4)',
     zIndex: 25,
-    transition: 'transform 4s ease-in-out',
+    transition: 'transform 9s ease-in-out',
     transform: 'translateX(0) rotate(' + (Math.random() * 20 - 10) + 'deg)',
     cursor: 'pointer',
   });
@@ -913,7 +913,7 @@ function maybeMeme(chance = 0.35, mood = null) {
     img.style.transform = 'translateX(' + (fromLeft ? '160vw' : '-160vw') + ') rotate(' + (Math.random() * 30 - 15) + 'deg)';
   }));
   img.addEventListener('click', () => img.remove());
-  setTimeout(() => img.remove(), 4200);
+  setTimeout(() => img.remove(), 9300);
 }
 
 // --- Мини-игра «Поймай сердечки» ---
