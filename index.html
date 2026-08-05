@@ -301,7 +301,7 @@
     display: none;
     z-index: 40;
     overflow: hidden;
-    touch-action: manipulation;
+    touch-action: none;
   }
   .game-bg.open { display: block; }
   .game-hud {
@@ -1062,6 +1062,12 @@ async function initPlayer() {
   load(0);
 }
 initPlayer();
+
+// внутри игры глушим двойной тап (зум), но не трогаем кнопки выхода/повтора
+gameBg.addEventListener('touchend', e => {
+  if (e.target.tagName !== 'BUTTON') e.preventDefault();
+}, { passive: false });
+gameBg.addEventListener('dblclick', e => e.preventDefault());
 
 document.getElementById('gameBtn').addEventListener('click', () => { startGame(); notify('Катя играет в «Поймай сердечки» 🎮'); });
 document.getElementById('gameAgain').addEventListener('click', startGame);
