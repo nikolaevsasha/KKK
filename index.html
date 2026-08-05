@@ -815,10 +815,12 @@ async function initMoodPhotos() {
     const fromManifest = manifest && manifest.moods && manifest.moods[mood];
     if (fromManifest && fromManifest.length) {
       moodPhotos[mood] = fromManifest.map(f => 'photos/' + f);
+    } else if (manifest) {
+      // манифест есть, значит поиск по именам не нужен: берём фото из общей галереи
+      moodPhotos[mood] = all;
     } else {
       const probed = await discover(mood, 10);
-      // если именованных фото нет — берём случайные из общей галереи
-      moodPhotos[mood] = probed.length ? probed : all;
+      moodPhotos[mood] = probed;
     }
   }
 }
