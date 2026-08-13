@@ -104,35 +104,73 @@ let lockUntil = 0;
 
 /* ------------------------------- demo data -------------------------------- */
 
+// Categories belong to a group; groups are what the Sankey and reports roll up to.
 const DEFAULT_CATEGORIES = [
-  { name: 'Paycheck', icon: '💼', group: 'income' },
-  { name: 'Interest', icon: '🏦', group: 'income' },
-  { name: 'Other income', icon: '💰', group: 'income' },
-  { name: 'Groceries', icon: '🛒', group: 'expense' },
-  { name: 'Restaurants', icon: '🍽️', group: 'expense' },
-  { name: 'Coffee', icon: '☕', group: 'expense' },
-  { name: 'Transport', icon: '🚕', group: 'expense' },
-  { name: 'Gas', icon: '⛽', group: 'expense' },
-  { name: 'Rent', icon: '🏠', group: 'expense' },
-  { name: 'Utilities', icon: '💡', group: 'expense' },
-  { name: 'Internet & phone', icon: '📶', group: 'expense' },
-  { name: 'Shopping', icon: '🛍️', group: 'expense' },
-  { name: 'Entertainment', icon: '🎬', group: 'expense' },
-  { name: 'Subscriptions', icon: '📺', group: 'expense' },
-  { name: 'Health', icon: '⚕️', group: 'expense' },
-  { name: 'Fitness', icon: '🏋️', group: 'expense' },
-  { name: 'Travel', icon: '✈️', group: 'expense' },
-  { name: 'Gifts', icon: '🎁', group: 'expense' },
-  { name: 'Education', icon: '📚', group: 'expense' },
-  { name: 'Fees', icon: '🧾', group: 'expense' },
-  { name: 'Other', icon: '📦', group: 'expense' },
+  // Income
+  { name: 'Paychecks', icon: '💵', type: 'income', group: 'Income' },
+  { name: 'Interest', icon: '🏦', type: 'income', group: 'Income' },
+  { name: 'Other Income', icon: '💰', type: 'income', group: 'Income' },
+  // Housing
+  { name: 'Mortgage', icon: '🏡', type: 'expense', group: 'Housing' },
+  { name: 'Rent', icon: '🏠', type: 'expense', group: 'Housing' },
+  { name: 'Home Improvement', icon: '🔨', type: 'expense', group: 'Housing' },
+  // Financial
+  { name: 'Loan Repayment', icon: '💸', type: 'expense', group: 'Financial' },
+  { name: 'Insurance', icon: '☂️', type: 'expense', group: 'Financial' },
+  { name: 'Cash & ATM', icon: '🏧', type: 'expense', group: 'Financial' },
+  { name: 'Fees', icon: '🧾', type: 'expense', group: 'Financial' },
+  // Bills & Utilities
+  { name: 'Garbage', icon: '🗑️', type: 'expense', group: 'Bills & Utilities' },
+  { name: 'Water', icon: '🚰', type: 'expense', group: 'Bills & Utilities' },
+  { name: 'Gas & Electric', icon: '💡', type: 'expense', group: 'Bills & Utilities' },
+  { name: 'Internet & Cable', icon: '📶', type: 'expense', group: 'Bills & Utilities' },
+  { name: 'Phone', icon: '📱', type: 'expense', group: 'Bills & Utilities' },
+  // Food & Dining
+  { name: 'Groceries', icon: '🛒', type: 'expense', group: 'Food & Dining' },
+  { name: 'Restaurants & Bars', icon: '🍽️', type: 'expense', group: 'Food & Dining' },
+  { name: 'Coffee Shops', icon: '☕', type: 'expense', group: 'Food & Dining' },
+  // Transportation
+  { name: 'Gas', icon: '⛽', type: 'expense', group: 'Transportation' },
+  { name: 'Auto Payment', icon: '🚗', type: 'expense', group: 'Transportation' },
+  { name: 'Public Transit', icon: '🚊', type: 'expense', group: 'Transportation' },
+  { name: 'Auto Maintenance', icon: '🔧', type: 'expense', group: 'Transportation' },
+  // Travel & Lifestyle
+  { name: 'Travel & Vacation', icon: '✈️', type: 'expense', group: 'Travel & Lifestyle' },
+  { name: 'Entertainment & Recreation', icon: '🎬', type: 'expense', group: 'Travel & Lifestyle' },
+  { name: 'Pets', icon: '🐾', type: 'expense', group: 'Travel & Lifestyle' },
+  { name: 'Fun Money', icon: '🎉', type: 'expense', group: 'Travel & Lifestyle' },
+  // Shopping
+  { name: 'Shopping', icon: '🛍️', type: 'expense', group: 'Shopping' },
+  { name: 'Clothing', icon: '👕', type: 'expense', group: 'Shopping' },
+  { name: 'Electronics', icon: '💻', type: 'expense', group: 'Shopping' },
+  { name: 'Gifts', icon: '🎁', type: 'expense', group: 'Shopping' },
+  // Health & Wellness
+  { name: 'Medical', icon: '⚕️', type: 'expense', group: 'Health & Wellness' },
+  { name: 'Dentist', icon: '🦷', type: 'expense', group: 'Health & Wellness' },
+  { name: 'Fitness', icon: '🏋️', type: 'expense', group: 'Health & Wellness' },
+  // Other
+  { name: 'Miscellaneous', icon: '📦', type: 'expense', group: 'Other' },
 ];
+
+// Group display order — reports and the Sankey follow it.
+const GROUP_ORDER = ['Income', 'Housing', 'Financial', 'Bills & Utilities', 'Food & Dining',
+  'Transportation', 'Travel & Lifestyle', 'Shopping', 'Health & Wellness', 'Other'];
 
 function ensureCategories() {
   if (db.categories.length === 0) {
     db.categories = DEFAULT_CATEGORIES.map((c) => ({ id: uid(), ...c }));
     save();
+    return;
   }
+  // Migrate pre-group categories, where `group` held 'income' / 'expense'.
+  let changed = false;
+  for (const c of db.categories) {
+    if (c.type) continue;
+    c.type = c.group === 'income' ? 'income' : 'expense';
+    c.group = c.type === 'income' ? 'Income' : 'Other';
+    changed = true;
+  }
+  if (changed) save();
 }
 
 function seedDemo() {
@@ -146,73 +184,110 @@ function seedDemo() {
     return d;
   };
 
-  const mkHistory = (start, drift, vol, points = 12) => {
+  // Walk backwards from the account's real balance so the history always ends
+  // exactly where the account stands today — otherwise the net-worth line
+  // jumps at the last point.
+  const mkHistory = (end, drift, vol, points = 13) => {
     const h = [];
-    let v = start;
-    for (let i = points - 1; i >= 0; i--) {
-      v = Math.max(0, v + drift + (Math.sin(i * 2.7) * vol));
-      h.push({ date: iso(daysAgo(i * 30)), balance: Math.round(v) });
+    for (let i = 0; i < points; i++) {
+      const v = end - drift * i + Math.sin(i * 2.7) * vol;
+      h.unshift({ date: iso(daysAgo(i * 30)), balance: Math.max(0, Math.round(v * 100) / 100) });
     }
     return h;
   };
 
-  const checking = { id: uid(), name: 'Everyday Checking', type: 'checking', balance: 4820, history: mkHistory(3200, 140, 260) };
-  const savings = { id: uid(), name: 'High-Yield Savings', type: 'savings', balance: 21500, history: mkHistory(14000, 640, 120) };
-  const credit = { id: uid(), name: 'Travel Rewards Card', type: 'credit', balance: 1240, history: mkHistory(900, 25, 300) };
-  const invest = { id: uid(), name: 'Index Portfolio', type: 'investment', balance: 38600, history: mkHistory(26000, 1050, 900) };
-  const loan = { id: uid(), name: 'Car Loan', type: 'loan', balance: 9800, history: mkHistory(13400, -300, 0) };
-  db.accounts = [checking, savings, credit, invest, loan];
+  const checking = { id: uid(), name: 'Everyday Checking', type: 'checking', institution: 'Citi', balance: 15234.75, history: mkHistory(15234.75, 260, 520) };
+  const savings = { id: uid(), name: 'Joint Savings', type: 'savings', institution: 'Ally', balance: 50107.55, history: mkHistory(50107.55, 1250, 340) };
+  const credit = { id: uid(), name: 'Joint Credit Card', type: 'credit', institution: 'Amex', balance: 2828.99, history: mkHistory(2828.99, 30, 420) };
+  const invest = { id: uid(), name: 'Retirement 401k', type: 'investment', institution: 'Fidelity', balance: 180336.73, history: mkHistory(180336.73, 3100, 2600) };
+  const brokerage = { id: uid(), name: 'Index Brokerage', type: 'investment', institution: 'Vanguard', balance: 88420.4, history: mkHistory(88420.4, 1500, 1700) };
+  const home = { id: uid(), name: 'Primary Residence', type: 'property', institution: 'Zillow', balance: 300625.05, history: mkHistory(300625.05, 900, 0) };
+  const car = { id: uid(), name: 'Toyota RAV4', type: 'property', institution: 'KBB', balance: 20739.77, history: mkHistory(20739.77, -320, 0) };
+  const mortgage = { id: uid(), name: 'Home Mortgage', type: 'loan', institution: 'Wells Fargo', balance: 197400.5, history: mkHistory(197400.5, -640, 0) };
+  const carLoan = { id: uid(), name: 'Auto Loan', type: 'loan', institution: 'Chase', balance: 9800, history: mkHistory(9800, -420, 0) };
+  db.accounts = [checking, savings, credit, invest, brokerage, home, car, mortgage, carLoan];
 
-  const merchants = {
-    Groceries: ['Whole Harvest Market', 'Corner Grocer', 'FreshMart'],
-    Restaurants: ['Luna Trattoria', 'Saigon Kitchen', 'The Brass Fork'],
-    Coffee: ['Ritual Coffee', 'Bluebird Espresso'],
-    Transport: ['Metro Transit', 'CityRide'],
-    Gas: ['Shell', 'Chevron'],
-    Shopping: ['Amazon', 'Uniqlo', 'REI'],
-    Entertainment: ['Cinema Plaza', 'Steam'],
-    Subscriptions: ['Netflix', 'Spotify', 'iCloud'],
-    Health: ['Walgreens', 'City Dental'],
-    Fitness: ['Iron Works Gym'],
-    Utilities: ['City Power & Water'],
-    'Internet & phone': ['Comcast', 'T-Mobile'],
-    Travel: ['Delta Air Lines', 'Airbnb'],
-  };
-  const txs = [];
   const rnd = (() => { let s = 42; return () => { s = (s * 1103515245 + 12345) % 2147483648; return s / 2147483648; }; })();
-  for (let m = 0; m < 6; m++) {
-    const monthStart = new Date(today.getFullYear(), today.getMonth() - m, 1);
-    const dim = m === 0 ? today.getDate() : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
-    // income
-    txs.push({ id: uid(), date: iso(new Date(monthStart.getFullYear(), monthStart.getMonth(), 1)), merchant: 'Acme Corp Payroll', category: cat('Paycheck'), accountId: checking.id, amount: 4650, notes: '' });
-    if (dim >= 15) txs.push({ id: uid(), date: iso(new Date(monthStart.getFullYear(), monthStart.getMonth(), 15)), merchant: 'Acme Corp Payroll', category: cat('Paycheck'), accountId: checking.id, amount: 4650, notes: '' });
-    // rent + utilities
-    txs.push({ id: uid(), date: iso(new Date(monthStart.getFullYear(), monthStart.getMonth(), Math.min(2, dim))), merchant: 'Oakwood Apartments', category: cat('Rent'), accountId: checking.id, amount: -2350, notes: '' });
-    if (dim >= 8) txs.push({ id: uid(), date: iso(new Date(monthStart.getFullYear(), monthStart.getMonth(), 8)), merchant: 'City Power & Water', category: cat('Utilities'), accountId: checking.id, amount: -Math.round(90 + rnd() * 60), notes: '' });
-    // scattered spending
-    const catNames = Object.keys(merchants);
-    const n = 22 + Math.floor(rnd() * 8);
+  const txs = [];
+  const add = (date, merchant, category, accountId, amount) =>
+    txs.push({ id: uid(), date, merchant, category, accountId, amount, notes: '' });
+
+  // Fixed monthly commitments — these make the Sankey and Recurring page look real.
+  const FIXED = [
+    [1, 'Acme Corp Payroll', 'Paychecks', checking.id, 2100],
+    [15, 'Acme Corp Payroll', 'Paychecks', checking.id, 2100],
+    [1, 'Wells Fargo Home Mortgage', 'Mortgage', checking.id, -1385],
+    [5, 'Student Loan Payment', 'Loan Repayment', checking.id, -500.23],
+    [5, 'State Farm', 'Insurance', checking.id, -90.91],
+    [5, 'State Farm', 'Insurance', checking.id, -110.54],
+    [5, 'HOA Monthly Dues', 'Garbage', checking.id, -320.47],
+    [8, 'City Power & Light', 'Gas & Electric', checking.id, -108],
+    [10, 'Comcast Xfinity', 'Internet & Cable', checking.id, -115],
+    [12, 'T-Mobile', 'Phone', checking.id, -140],
+    [14, 'City Water Dept', 'Water', checking.id, -62.4],
+    [18, 'Iron Works Gym', 'Fitness', credit.id, -49],
+    [20, 'Netflix', 'Entertainment & Recreation', credit.id, -22.99],
+    [22, 'Spotify', 'Entertainment & Recreation', credit.id, -11.99],
+    [24, 'Happy Paws Vet Plan', 'Pets', credit.id, -150],
+  ];
+
+  // Variable spending — merchant pools per category.
+  const VARIABLE = {
+    Groceries: [['Whole Harvest Market', 95], ['Corner Grocer', 42], ['FreshMart', 68]],
+    'Restaurants & Bars': [['Luna Trattoria', 58], ['Saigon Kitchen', 34], ['The Brass Fork', 72]],
+    'Coffee Shops': [['Ritual Coffee', 6.5], ['Bluebird Espresso', 5.25]],
+    Gas: [['Shell', 46], ['Chevron', 52]],
+    'Public Transit': [['Metro Transit', 12]],
+    'Auto Maintenance': [['Pep Boys', 120]],
+    Shopping: [['Amazon', 64], ['Target', 88]],
+    Clothing: [['Uniqlo', 75]],
+    Electronics: [['Best Buy', 100]],
+    'Home Improvement': [['Home Depot', 104], ['Ace Hardware', 48]],
+    Medical: [['Walgreens', 32]],
+    'Travel & Vacation': [['Delta Air Lines', 320], ['Airbnb', 260]],
+    'Fun Money': [['Cinema Plaza', 24], ['Steam', 30]],
+    'Cash & ATM': [['ATM Withdrawal', 40]],
+  };
+  const varNames = Object.keys(VARIABLE);
+
+  for (let m = 5; m >= 0; m--) {
+    const ms = new Date(today.getFullYear(), today.getMonth() - m, 1);
+    const Y = ms.getFullYear(), M = ms.getMonth();
+    const dim = m === 0 ? today.getDate() : new Date(Y, M + 1, 0).getDate();
+
+    for (const [day, merchant, cname, acct, amt] of FIXED) {
+      if (day > dim) continue;
+      add(iso(new Date(Y, M, day)), merchant, cat(cname), acct, amt);
+    }
+    // Quarterly interest on savings.
+    if (M % 3 === 0) add(iso(new Date(Y, M, Math.min(28, dim))), 'Savings Interest', cat('Interest'), savings.id, 31.4);
+
+    // Keep variable spending under the paycheck so the demo shows a positive
+    // savings rate, the way a healthy month actually looks.
+    const n = 7 + Math.floor(rnd() * 4);
     for (let i = 0; i < n; i++) {
-      const cname = catNames[Math.floor(rnd() * catNames.length)];
-      const ms = merchants[cname];
-      const day = 1 + Math.floor(rnd() * dim);
-      const base = { Groceries: 60, Restaurants: 45, Coffee: 7, Transport: 18, Gas: 48, Shopping: 70, Entertainment: 25, Subscriptions: 12, Health: 35, Fitness: 45, Utilities: 60, 'Internet & phone': 55, Travel: 220 }[cname] || 30;
-      txs.push({
-        id: uid(),
-        date: iso(new Date(monthStart.getFullYear(), monthStart.getMonth(), day)),
-        merchant: ms[Math.floor(rnd() * ms.length)],
-        category: cat(cname),
-        accountId: rnd() < 0.4 ? credit.id : checking.id,
-        amount: -Math.round(base * (0.5 + rnd() * 1.4) * 100) / 100,
-        notes: '',
-      });
+      const cname = varNames[Math.floor(rnd() * varNames.length)];
+      const pool = VARIABLE[cname];
+      const [merchant, base] = pool[Math.floor(rnd() * pool.length)];
+      // Travel only shows up occasionally, so it doesn't dominate every month.
+      if (cname === 'Travel & Vacation' && rnd() > 0.35) continue;
+      add(iso(new Date(Y, M, 1 + Math.floor(rnd() * dim))), merchant, cat(cname),
+        rnd() < 0.45 ? credit.id : checking.id,
+        -Math.round(base * (0.6 + rnd() * 0.9) * 100) / 100);
     }
   }
   txs.sort((a, b) => b.date.localeCompare(a.date));
   db.transactions = txs;
 
   db.budgets = {};
-  const budgetPlan = { Groceries: 600, Restaurants: 350, Coffee: 60, Transport: 120, Gas: 160, Rent: 2350, Utilities: 160, 'Internet & phone': 120, Shopping: 300, Entertainment: 120, Subscriptions: 60, Health: 100, Fitness: 60, Travel: 250 };
+  const budgetPlan = {
+    Mortgage: 1385, 'Home Improvement': 150, 'Loan Repayment': 500, Insurance: 210,
+    Garbage: 320, 'Gas & Electric': 120, 'Internet & Cable': 115, Phone: 140, Water: 70,
+    Groceries: 600, 'Restaurants & Bars': 350, 'Coffee Shops': 60,
+    Gas: 160, 'Public Transit': 60, Shopping: 300, Clothing: 120, Electronics: 80,
+    'Travel & Vacation': 250, 'Entertainment & Recreation': 90, Pets: 150, 'Fun Money': 100,
+    Medical: 100, Fitness: 50, 'Cash & ATM': 80,
+  };
   for (const [name, amt] of Object.entries(budgetPlan)) db.budgets[cat(name)] = amt;
 
   db.goals = [

@@ -9,20 +9,37 @@ single JSON file on your VPS. Nothing is sent anywhere else.
 
 ## Features
 
-- **Dashboard** — net worth with a 1M/3M/6M/1Y/ALL chart, assets vs liabilities,
-  spending donut, budget snapshot, accounts, recent activity, goals
+- **Dashboard** — net worth trend, income/expense/savings-rate tiles, spending
+  donut, budget snapshot, accounts, recent activity, goals
 - **Accounts** — checking, savings, cash, investments, credit cards, loans,
-  property; liabilities subtract from net worth automatically, and balance edits
-  are recorded so the net-worth chart grows over time
-- **Transactions** — add/edit/delete, search, filter by month/category/account,
-  grouped by date
-- **Cash flow** — 6-month income vs expenses bars, per-category breakdown
-- **Budget** — monthly limits per category with over/under tracking
+  property, grouped into Cash / Credit Cards / Investments / Real Estate /
+  Loans with per-account sparklines and an assets-vs-liabilities breakdown.
+  Liabilities subtract from net worth automatically, and every balance edit is
+  recorded so the net-worth chart grows over time.
+- **Transactions** — add/edit/delete, search, filter by category and account,
+  grouped by date with daily totals, CSV export
+- **Reports** — three tabs:
+  - *Cash Flow*: a **Sankey diagram** flowing income → categories, collapsing to
+    group level on phones
+  - *Spending*: donut by category or group, with a transaction list and summary
+  - *Income*: donut by income source
+- **Cash Flow** — six months of income vs expenses, plus net savings per month
+- **Budget** — monthly limits per category, organised by category group
+- **Recurring** — detects subscriptions and fixed bills automatically (any
+  merchant seen in three or more months), with estimated monthly and yearly cost
 - **Goals** — savings goals with progress bars
-- **Settings** — currency (15 supported), custom categories, password change,
-  JSON export, demo data, erase-all
+- **Investments** — portfolio value over time and allocation across accounts
+- **Advice** — insights generated from your own data: savings rate, over-budget
+  categories, recurring-payment load, month-over-month spending swings
+- **Settings** — currency (15 supported), custom categories and groups, password
+  change, JSON export, demo data, erase-all
 - **PWA** — installable on iOS/Android/desktop, works offline for the shell,
   dark mode follows the system
+
+Categories are organised into groups (Housing, Financial, Bills & Utilities,
+Food & Dining, Transportation, Travel & Lifestyle, Shopping, Health & Wellness),
+which is what the Sankey, the reports, and the budget page roll up to. You can
+add your own categories and groups in Settings.
 
 ## Quick start (local)
 
@@ -122,9 +139,15 @@ Settings → **Export** downloads the same data as JSON from any device.
 server.js              Node HTTP server: static files + JSON API + auth
 public/index.html      App shell
 public/styles.css      Theme, layout, components, dark mode
-public/app.js          Router, pages, charts, modals
+public/app.js          Router, pages, modals, derived data
+public/charts.js       Line/area, grouped bars, donut, sankey, sparkline
+public/icons.js        Line icon set
 public/sw.js           Service worker (offline shell)
 public/manifest.webmanifest
 tools/make-icons.js    Regenerates PNG icons from the SVG mark
 deploy/                systemd unit, nginx config, Dockerfile, compose
 ```
+
+The chart palette is colourblind-safe: it was validated for lightness band,
+chroma, CVD separation, and contrast in both light and dark mode. Every chart
+also ships a "View as table" fallback, so no value is conveyed by colour alone.

@@ -1,6 +1,6 @@
 /* Finch service worker — cache static shell, never cache API. */
-const VERSION = 'finch-v1';
-const SHELL = ['/', '/styles.css', '/app.js', '/manifest.webmanifest', '/icons/icon.svg', '/icons/icon-192.png'];
+const VERSION = 'finch-v2';
+const SHELL = ['/', '/styles.css', '/app.js', '/charts.js', '/icons.js', '/manifest.webmanifest', '/icons/icon.svg', '/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
