@@ -29,6 +29,10 @@ const defaultDb = () => ({
   categories: [],
   budgets: {}, // categoryId -> monthly amount
   goals: [],
+  subscriptions: [], // manually tracked recurring services
+  bills: [],         // one-off amounts owed, with due dates
+  wishlist: [],      // things to buy later
+  rules: [],         // { match, categoryId } merchant -> category, learned on import
 });
 
 let db;
@@ -125,6 +129,7 @@ const DEFAULT_CATEGORIES = [
   { name: 'Gas & Electric', icon: '💡', type: 'expense', group: 'Bills & Utilities' },
   { name: 'Internet & Cable', icon: '📶', type: 'expense', group: 'Bills & Utilities' },
   { name: 'Phone', icon: '📱', type: 'expense', group: 'Bills & Utilities' },
+  { name: 'Software & Subscriptions', icon: '💻', type: 'expense', group: 'Bills & Utilities' },
   // Food & Dining
   { name: 'Groceries', icon: '🛒', type: 'expense', group: 'Food & Dining' },
   { name: 'Restaurants & Bars', icon: '🍽️', type: 'expense', group: 'Food & Dining' },
@@ -331,6 +336,10 @@ function publicState() {
     categories: db.categories,
     budgets: db.budgets,
     goals: db.goals,
+    subscriptions: db.subscriptions,
+    bills: db.bills,
+    wishlist: db.wishlist,
+    rules: db.rules,
   };
 }
 
@@ -392,7 +401,7 @@ async function handleApi(req, res, pathname) {
 
   if (pathname === '/api/wipe' && req.method === 'POST') {
     db.accounts = []; db.transactions = []; db.goals = []; db.budgets = {};
-    db.categories = [];
+    db.categories = []; db.subscriptions = []; db.bills = []; db.wishlist = []; db.rules = [];
     ensureCategories();
     return json(res, 200, publicState());
   }
@@ -418,7 +427,7 @@ async function handleApi(req, res, pathname) {
   }
 
   // Collection CRUD: /api/{accounts|transactions|goals|categories}[/:id]
-  const collMatch = pathname.match(/^\/api\/(accounts|transactions|goals|categories)(?:\/([a-f0-9]+))?$/);
+  const collMatch = pathname.match(/^\/api\/(accounts|transactions|goals|categories|subscriptions|bills|wishlist|rules)(?:\/([a-f0-9]+))?$/);
   if (collMatch) {
     const [, coll, id] = collMatch;
     const list = db[coll];
@@ -464,6 +473,62 @@ async function handleApi(req, res, pathname) {
       save();
       return json(res, 200, { ok: true });
     }
+  }
+
+  // Bulk transaction insert used by the CSV importer. Skips rows that already
+  // exist (same date + amount + merchant) so re-importing a statement is safe.
+  if (pathname === '/api/transactions/bulk' && req.method === 'POST') {
+    const { transactions = [] } = await readBody(req);
+    if (!Array.isArray(transactions)) return json(res, 400, { error: 'Expected a transactions array' });
+    const seen = new Set(db.transactions.map((t) =>
+      `${t.date}|${Number(t.amount).toFixed(2)}|${(t.merchant || '').trim().toLowerCase()}`));
+    const added = [];
+    let skipped = 0;
+    for (const raw of transactions) {
+      const t = {
+        id: uid(),
+        date: String(raw.date || '').slice(0, 10),
+        merchant: String(raw.merchant || '').slice(0, 200),
+        amount: Number(raw.amount) || 0,
+        category: raw.category || '',
+        accountId: raw.accountId || '',
+        notes: String(raw.notes || '').slice(0, 500),
+      };
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date) || !t.amount) { skipped++; continue; }
+      const key = `${t.date}|${t.amount.toFixed(2)}|${t.merchant.trim().toLowerCase()}`;
+      if (seen.has(key)) { skipped++; continue; }
+      seen.add(key);
+      db.transactions.push(t);
+      added.push(t);
+    }
+    db.transactions.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    save();
+    return json(res, 200, { added: added.length, skipped, transactions: db.transactions });
+  }
+
+  // Mark a bill paid: removes it and optionally records the payment.
+  if (pathname === '/api/bills/pay' && req.method === 'POST') {
+    const { id, accountId, categoryId, date } = await readBody(req);
+    const idx = db.bills.findIndex((b) => b.id === id);
+    if (idx === -1) return json(res, 404, { error: 'Not found' });
+    const bill = db.bills[idx];
+    let tx = null;
+    if (accountId) {
+      tx = {
+        id: uid(),
+        date: (date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+        merchant: bill.name,
+        amount: -Math.abs(Number(bill.amount) || 0),
+        category: categoryId || bill.category || '',
+        accountId,
+        notes: 'Bill payment',
+      };
+      db.transactions.push(tx);
+      db.transactions.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    }
+    db.bills.splice(idx, 1);
+    save();
+    return json(res, 200, { ok: true, transaction: tx, bills: db.bills, transactions: db.transactions });
   }
 
   if (pathname === '/api/budgets' && req.method === 'PUT') {

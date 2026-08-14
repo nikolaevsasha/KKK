@@ -49,6 +49,8 @@ const S = {
   nwRange: '1M',
   txFilter: { q: '', cat: '', acct: '' },
   spendMode: 'category',
+  subscriptions: [], bills: [], wishlist: [], rules: [],
+  recurTab: 'manual',
 };
 
 const LIABILITY_TYPES = new Set(['credit', 'loan']);
@@ -333,6 +335,8 @@ const NAV = [
   ['reports', 'Reports', 'reports'],
   ['budget', 'Budget', 'budget'],
   ['recurring', 'Recurring', 'recurring'],
+  ['bills', 'Left to pay', 'wallet'],
+  ['wishlist', 'Wishlist', 'list'],
   ['goals', 'Goals', 'goals'],
   ['investments', 'Investments', 'investments'],
   ['advice', 'Advice', 'advice'],
@@ -344,7 +348,8 @@ const TABS = [
   ['reports', 'Reports', 'reports'],
   ['more', 'More', 'list'],
 ];
-const MORE_ROUTES = ['cashflow', 'budget', 'recurring', 'goals', 'investments', 'advice', 'settings', 'more'];
+const MORE_ROUTES = ['cashflow', 'budget', 'recurring', 'bills', 'wishlist', 'goals',
+  'investments', 'advice', 'settings', 'more'];
 
 const BRAND_SVG = `<svg viewBox="0 0 32 32" width="26" height="26" fill="none" aria-hidden="true">
   <path d="M16 16c-3.6-5.4-8.2-8-11.4-6.2C1.6 11.4 1.7 16.6 4.8 19.4c2.6 2.4 7.2 1.4 11.2-3.4z" fill="currentColor" opacity="0.9"/>
@@ -486,6 +491,7 @@ function parseHash() {
 }
 
 window.addEventListener('hashchange', () => {
+  if (location.hash.startsWith('#/add')) { handleQuickRoute(); return; }
   const { route, tab } = parseHash();
   if (route !== S.route || tab !== S.tab) { S.route = route; S.tab = tab; render(); }
 });
@@ -502,6 +508,7 @@ const PAGES = {
   cashflow: pageCashflow, reports: pageReports, budget: pageBudget,
   recurring: pageRecurring, goals: pageGoals, investments: pageInvestments,
   advice: pageAdvice, settings: pageSettings, more: pageMore,
+  bills: pageBills, wishlist: pageWishlist,
 };
 
 function render() {
@@ -647,6 +654,38 @@ function pageDashboard(main) {
       S.transactions.length
         ? h('div', { class: 'row-list' }, ...S.transactions.slice(0, 6).map((t) => txRow(t)))
         : h('div', { class: 'empty' }, h('p', {}, 'Nothing yet.')))));
+
+  const openBills = S.bills.slice().sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
+  const subsMonthly = S.subscriptions.reduce((s2, x) => s2 + monthlyCost(x), 0);
+  if (openBills.length || S.subscriptions.length) {
+    main.append(h('div', { class: 'grid-2' },
+      openBills.length ? card(cardHead(null, 'Left to pay',
+        h('a', { href: '#/bills', onclick: (e) => { e.preventDefault(); go('bills'); } }, 'All →')),
+        h('div', { class: 'hero-number', style: 'font-size:24px;margin-bottom:8px' },
+          fmt(openBills.reduce((s2, b) => s2 + (Number(b.amount) || 0), 0))),
+        h('div', { class: 'row-list' }, ...openBills.slice(0, 4).map((b) => {
+          const d = daysUntil(b.due);
+          return h('div', { class: 'row clickable', onclick: () => go('bills') },
+            h('div', { class: 'r-icon' }, catById(b.category)?.icon || '🧾'),
+            h('div', { class: 'r-main' },
+              h('div', { class: 'r-title' }, b.name),
+              h('div', { class: 'r-sub', style: d < 0 ? 'color:var(--neg)' : '' },
+                d === null ? 'No due date' : d < 0 ? `${-d} days overdue` : d === 0 ? 'Due today' : `Due in ${d} days`)),
+            h('div', { class: 'r-amt' }, fmt(Number(b.amount) || 0)));
+        }))) : null,
+      S.subscriptions.length ? card(cardHead(null, 'Subscriptions',
+        h('a', { href: '#/recurring', onclick: (e) => { e.preventDefault(); go('recurring'); } }, 'All →')),
+        h('div', { class: 'hero-number', style: 'font-size:24px;margin-bottom:8px' },
+          `${fmt(subsMonthly)} /mo`),
+        h('div', { class: 'row-list' }, ...S.subscriptions.slice()
+          .sort((a, b) => monthlyCost(b) - monthlyCost(a)).slice(0, 4).map((sub) =>
+            h('div', { class: 'row clickable', onclick: () => go('recurring') },
+              h('div', { class: 'r-icon' }, catById(sub.category)?.icon || '🔁'),
+              h('div', { class: 'r-main' },
+                h('div', { class: 'r-title' }, sub.name),
+                h('div', { class: 'r-sub' }, freqLabel(sub.frequency))),
+              h('div', { class: 'r-amt' }, fmt(Number(sub.amount) || 0)))))) : null));
+  }
 
   if (S.goals.length) {
     main.append(card(cardHead(null, 'Goals',
@@ -815,6 +854,8 @@ function accountModal(a) {
 function pageTransactions(main) {
   setTopbar('Transactions', [], [
     dateRangeButton(),
+    h('button', { class: 'btn', onclick: importModal },
+      h('span', { class: 'ic-wrap', html: icon('upload', 15) }), lbl('Import CSV')),
     h('button', { class: 'btn btn-primary', onclick: () => txModal(null) },
       h('span', { class: 'ic-wrap', html: icon('plus', 15) }), lbl('Add')),
   ]);
@@ -1546,6 +1587,8 @@ function pageMore(main) {
     ...[['cashflow', 'Cash Flow', 'Income vs expenses over time'],
       ['budget', 'Budget', 'Monthly limits per category'],
       ['recurring', 'Recurring', 'Subscriptions and fixed bills'],
+      ['bills', 'Left to pay', 'What you still owe, by due date'],
+      ['wishlist', 'Wishlist', 'Things to buy later'],
       ['goals', 'Goals', 'Savings goals and progress'],
       ['investments', 'Investments', 'Portfolio value and allocation'],
       ['advice', 'Advice', 'Insights from your data'],
@@ -1600,6 +1643,10 @@ function pageSettings(main) {
       h('button', { class: 'btn btn-sm', onclick: logout }, 'Log out'))));
 
   main.append(card(cardHead(null, 'Data'),
+    h('div', { class: 'settings-row' },
+      h('div', {}, h('div', { class: 's-label' }, 'Import bank statement'),
+        h('div', { class: 's-sub' }, 'Load a CSV export from your bank')),
+      h('button', { class: 'btn btn-sm', onclick: importModal }, 'Import CSV')),
     h('div', { class: 'settings-row' },
       h('div', {}, h('div', { class: 's-label' }, 'Export data'), h('div', { class: 's-sub' }, 'Download everything as JSON')),
       h('button', { class: 'btn btn-sm', onclick: exportData }, 'Export')),
@@ -1773,9 +1820,10 @@ function showAuth(needsSetup) {
 async function startApp() {
   $('#auth-screen').classList.add('hidden');
   Object.assign(S, await api('/api/state'));
+  $('#app').classList.remove('hidden');
+  if (handleQuickRoute()) return;
   const { route, tab } = parseHash();
   S.route = route; S.tab = tab;
-  $('#app').classList.remove('hidden');
   render();
 }
 
@@ -1806,7 +1854,7 @@ $('#auth-form').addEventListener('submit', async (e) => {
   }
 });
 
-$('#fab').addEventListener('click', () => txModal(null));
+$('#fab').addEventListener('click', () => quickAdd());
 
 (async function init() {
   try {
@@ -1819,3 +1867,606 @@ $('#fab').addEventListener('click', () => txModal(null));
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 })();
+
+/* ============================ subscriptions ============================== */
+/* Manually tracked recurring services — the "Recurring" sheet.              */
+
+const FREQ = [['monthly', 'Monthly', 1], ['yearly', 'Yearly', 1 / 12],
+  ['weekly', 'Weekly', 52 / 12], ['quarterly', 'Quarterly', 1 / 3]];
+const freqFactor = (f) => (FREQ.find((x) => x[0] === f) || FREQ[0])[2];
+const freqLabel = (f) => (FREQ.find((x) => x[0] === f) || FREQ[0])[1];
+const monthlyCost = (sub) => (Number(sub.amount) || 0) * freqFactor(sub.frequency);
+
+function subscriptionModal(sub) {
+  const isNew = !sub;
+  const d = sub ? { ...sub } : {
+    name: '', amount: '', frequency: 'monthly', category: '', accountId: '', dayOfMonth: '', notes: '',
+  };
+  const byGroup = new Map();
+  for (const c of S.categories) {
+    if (c.type === 'income') continue;
+    if (!byGroup.has(c.group)) byGroup.set(c.group, []);
+    byGroup.get(c.group).push(c);
+  }
+  const form = h('form', { class: 'form-grid' },
+    field('Service', h('input', { name: 'name', value: d.name, required: true, placeholder: 'e.g. Contabo VPS' })),
+    h('div', { class: 'two-col' },
+      field('Amount', h('input', {
+        name: 'amount', type: 'number', step: '0.01', min: '0', inputmode: 'decimal',
+        required: true, value: d.amount, placeholder: '0.00',
+      })),
+      field('Billing', h('select', { name: 'frequency' },
+        ...FREQ.map(([v, l]) => h('option', { value: v, selected: d.frequency === v }, l))))),
+    h('div', { class: 'two-col' },
+      field('Renews on day', h('input', {
+        name: 'dayOfMonth', type: 'number', min: '1', max: '31', inputmode: 'numeric',
+        value: d.dayOfMonth || '', placeholder: 'e.g. 15',
+      })),
+      field('Paid from', h('select', { name: 'accountId' },
+        h('option', { value: '' }, '— none —'),
+        ...S.accounts.map((a) => h('option', { value: a.id, selected: d.accountId === a.id }, a.name))))),
+    field('Category', h('select', { name: 'category' },
+      h('option', { value: '' }, '— none —'),
+      ...[...byGroup.entries()].map(([g, cats]) =>
+        h('optgroup', { label: g }, ...cats.map((c) =>
+          h('option', { value: c.id, selected: d.category === c.id }, `${c.icon} ${c.name}`)))))),
+    field('Notes', h('input', { name: 'notes', value: d.notes || '', placeholder: 'Optional' })),
+  );
+  openModal(isNew ? 'Add subscription' : 'Edit subscription', form, {
+    onSave: async () => {
+      const fd = new FormData(form);
+      const body = {
+        name: fd.get('name'), amount: parseFloat(fd.get('amount')) || 0,
+        frequency: fd.get('frequency'), category: fd.get('category'),
+        accountId: fd.get('accountId'), notes: fd.get('notes'),
+        dayOfMonth: parseInt(fd.get('dayOfMonth'), 10) || null,
+      };
+      if (isNew) S.subscriptions.push(await api('/api/subscriptions', 'POST', body));
+      else Object.assign(sub, await api('/api/subscriptions/' + sub.id, 'PUT', body));
+      toast(isNew ? 'Subscription added' : 'Saved');
+      render();
+    },
+    onDelete: isNew ? null : async () => {
+      await api('/api/subscriptions/' + sub.id, 'DELETE');
+      S.subscriptions = S.subscriptions.filter((x) => x.id !== sub.id);
+      toast('Removed');
+      render();
+    },
+  });
+}
+
+function pageRecurring(main) {
+  const tabs = [['manual', 'Subscriptions'], ['detected', 'Detected']];
+  // The top bar marks the active tab from S.tab, so settle it before rendering.
+  if (!tabs.some(([id]) => id === S.tab)) S.tab = 'manual';
+  S.recurTab = S.tab;
+  setTopbar('Recurring', tabs,
+    [h('button', { class: 'btn btn-primary', onclick: () => subscriptionModal(null) },
+      h('span', { class: 'ic-wrap', html: icon('plus', 15) }), lbl('Add subscription'))]);
+
+  const subs = S.subscriptions.slice().sort((a, b) => monthlyCost(b) - monthlyCost(a));
+  const monthly = subs.reduce((s, x) => s + monthlyCost(x), 0);
+
+  main.append(h('div', { class: 'kpi-row' },
+    kpi(String(subs.length), 'Subscriptions'),
+    kpi(fmt(monthly), 'Per month'),
+    kpi(fmt(monthly * 12), 'Per year'),
+    kpi(fmt(subs.reduce((s, x) => s + (x.frequency === 'yearly' ? Number(x.amount) || 0 : 0), 0)), 'Billed yearly')));
+
+  if (S.recurTab === 'detected') {
+    const items = recurringItems();
+    const c = card(cardHead(null, 'Detected from your transactions'));
+    if (!items.length) {
+      c.append(emptyState('🔁', 'Nothing detected yet — a merchant needs to appear in three or more months.',
+        'Add a subscription', () => subscriptionModal(null)));
+    } else {
+      c.append(h('div', { class: 'row-list' }, ...items.map((it) => {
+        const cat = catById(it.category);
+        const known = S.subscriptions.some((s2) =>
+          s2.name.toLowerCase().trim() === it.merchant.toLowerCase().trim());
+        return h('div', { class: 'row' },
+          h('div', { class: 'r-icon' }, cat?.icon || '🔁'),
+          h('div', { class: 'r-main' },
+            h('div', { class: 'r-title' }, it.merchant),
+            h('div', { class: 'r-sub' },
+              `${cat?.name || 'Uncategorised'} · ${it.fixed ? 'fixed' : 'variable'} · next ~${fmtDate(it.next, true)}`)),
+          h('div', { class: 'r-amt' }, fmt(it.avg), h('div', { class: 'r-sub' }, `${it.count} payments`)),
+          known ? h('span', { class: 'ic-wrap', style: 'color:var(--pos)', html: icon('check', 16) })
+            : h('button', {
+              class: 'btn btn-sm', onclick: async () => {
+                const item = await api('/api/subscriptions', 'POST', {
+                  name: it.merchant, amount: Math.round(it.avg * 100) / 100,
+                  frequency: 'monthly', category: it.category, notes: 'Added from detected',
+                });
+                S.subscriptions.push(item);
+                toast('Tracked');
+                render();
+              },
+            }, 'Track'));
+      })));
+    }
+    main.append(c);
+    return;
+  }
+
+  if (!subs.length) {
+    main.append(card(emptyState('🔁',
+      'Track what you pay every month — hosting, phone, streaming, rent — and see the true monthly and yearly cost.',
+      'Add subscription', () => subscriptionModal(null))));
+    return;
+  }
+
+  const listCard = card(cardHead(null, 'Your subscriptions'),
+    h('div', { class: 'row-list' }, ...subs.map((sub) => {
+      const cat = catById(sub.category);
+      const mc = monthlyCost(sub);
+      return h('div', { class: 'row clickable', onclick: () => subscriptionModal(sub) },
+        h('div', { class: 'r-icon' }, cat?.icon || '🔁'),
+        h('div', { class: 'r-main' },
+          h('div', { class: 'r-title' }, sub.name),
+          h('div', { class: 'r-sub' }, [
+            freqLabel(sub.frequency),
+            sub.dayOfMonth ? `day ${sub.dayOfMonth}` : null,
+            cat?.name, acctById(sub.accountId)?.name,
+          ].filter(Boolean).join(' · '))),
+        h('div', { class: 'r-amt' }, fmt(Number(sub.amount) || 0),
+          sub.frequency !== 'monthly' ? h('div', { class: 'r-sub' }, `${fmt(mc)}/mo`) : null),
+        h('span', { class: 'ic-wrap chev', html: icon('chevronRight', 15) }));
+    })));
+
+  const segs = subs.slice(0, 8).map((sub, i) => ({
+    name: sub.name, value: monthlyCost(sub), display: fmt(monthlyCost(sub)),
+    color: cssVar(ACCT_COLORS[i % ACCT_COLORS.length]),
+  }));
+  const side = card(cardHead(null, 'Monthly split'),
+    stackedBar(segs),
+    h('div', { class: 'legend-list' }, ...segs.map((s2) =>
+      h('div', { class: 'key' },
+        h('span', { class: 'dot', style: `background:${s2.color}` }),
+        h('span', { class: 'nm' }, s2.name),
+        h('span', { class: 'val' }, s2.display)))),
+    h('div', { style: 'margin-top:14px' }, row2('Total per month', fmt(monthly))),
+    row2('Total per year', fmt(monthly * 12)));
+
+  main.append(h('div', { class: 'grid-side' }, listCard, side));
+}
+
+/* =============================== bills =================================== */
+/* One-off amounts owed with due dates — the "Left2Pay" sheet.               */
+
+function billModal(bill) {
+  const isNew = !bill;
+  const d = bill ? { ...bill } : { name: '', amount: '', due: todayISO(), category: '', notes: '' };
+  const expCats = S.categories.filter((c) => c.type !== 'income');
+  const form = h('form', { class: 'form-grid' },
+    field('Who / what', h('input', { name: 'name', value: d.name, required: true, placeholder: 'e.g. Chase' })),
+    h('div', { class: 'two-col' },
+      field('Amount owed', h('input', {
+        name: 'amount', type: 'number', step: '0.01', min: '0', inputmode: 'decimal',
+        required: true, value: d.amount, placeholder: '0.00',
+      })),
+      field('Due date', h('input', { name: 'due', type: 'date', value: d.due || todayISO() }))),
+    field('Category', h('select', { name: 'category' },
+      h('option', { value: '' }, '— none —'),
+      ...expCats.map((c) => h('option', { value: c.id, selected: d.category === c.id }, `${c.icon} ${c.name}`)))),
+    field('Notes', h('input', { name: 'notes', value: d.notes || '', placeholder: 'Optional' })),
+  );
+  openModal(isNew ? 'Add bill' : 'Edit bill', form, {
+    onSave: async () => {
+      const fd = new FormData(form);
+      const body = {
+        name: fd.get('name'), amount: parseFloat(fd.get('amount')) || 0,
+        due: fd.get('due'), category: fd.get('category'), notes: fd.get('notes'),
+      };
+      if (isNew) S.bills.push(await api('/api/bills', 'POST', body));
+      else Object.assign(bill, await api('/api/bills/' + bill.id, 'PUT', body));
+      toast(isNew ? 'Bill added' : 'Saved');
+      render();
+    },
+    onDelete: isNew ? null : async () => {
+      await api('/api/bills/' + bill.id, 'DELETE');
+      S.bills = S.bills.filter((x) => x.id !== bill.id);
+      toast('Removed');
+      render();
+    },
+  });
+}
+
+function payBillModal(bill) {
+  const expCats = S.categories.filter((c) => c.type !== 'income');
+  const form = h('form', { class: 'form-grid' },
+    h('p', { style: 'color:var(--ink-2);font-size:14px' },
+      `Marking ${bill.name} (${fmt(bill.amount)}) as paid.`),
+    field('Record payment from', h('select', { name: 'accountId' },
+      h('option', { value: '' }, "Don't record a transaction"),
+      ...S.accounts.map((a) => h('option', { value: a.id }, a.name)))),
+    h('div', { class: 'two-col' },
+      field('Paid on', h('input', { name: 'date', type: 'date', value: todayISO() })),
+      field('Category', h('select', { name: 'categoryId' },
+        h('option', { value: '' }, '— none —'),
+        ...expCats.map((c) => h('option', { value: c.id, selected: bill.category === c.id }, `${c.icon} ${c.name}`))))),
+  );
+  openModal('Mark as paid', form, {
+    saveLabel: 'Mark paid',
+    onSave: async () => {
+      const fd = new FormData(form);
+      const r = await api('/api/bills/pay', 'POST', {
+        id: bill.id, accountId: fd.get('accountId'),
+        categoryId: fd.get('categoryId'), date: fd.get('date'),
+      });
+      S.bills = r.bills;
+      S.transactions = r.transactions;
+      toast(r.transaction ? 'Paid and recorded' : 'Marked paid');
+      render();
+    },
+  });
+}
+
+function daysUntil(iso) {
+  if (!iso) return null;
+  return Math.round((new Date(iso + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 864e5);
+}
+
+function pageBills(main) {
+  setTopbar('Left to pay', [], [
+    h('button', { class: 'btn btn-primary', onclick: () => billModal(null) },
+      h('span', { class: 'ic-wrap', html: icon('plus', 15) }), lbl('Add bill')),
+  ]);
+
+  const bills = S.bills.slice().sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
+  if (!bills.length) {
+    main.append(card(emptyState('🧾',
+      'Track what you still owe and when it is due. Marking a bill paid can record the payment for you.',
+      'Add bill', () => billModal(null))));
+    return;
+  }
+
+  const total = bills.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+  const overdue = bills.filter((b) => daysUntil(b.due) < 0);
+  const week = bills.filter((b) => { const d = daysUntil(b.due); return d >= 0 && d <= 7; });
+  main.append(h('div', { class: 'kpi-row' },
+    kpi(fmt(total), 'Total owed', 'neg'),
+    kpi(String(bills.length), 'Open bills'),
+    kpi(fmt(overdue.reduce((s, b) => s + b.amount, 0)), 'Overdue', overdue.length ? 'neg' : null),
+    kpi(fmt(week.reduce((s, b) => s + b.amount, 0)), 'Due within 7 days')));
+
+  const c = card(cardHead(null, 'Bills by due date'));
+  c.append(h('div', { class: 'row-list' }, ...bills.map((b) => {
+    const d = daysUntil(b.due);
+    const cat = catById(b.category);
+    const when = d === null ? 'No due date'
+      : d < 0 ? `${-d} day${d === -1 ? '' : 's'} overdue`
+        : d === 0 ? 'Due today' : `Due in ${d} day${d === 1 ? '' : 's'}`;
+    return h('div', { class: 'row' },
+      h('div', { class: 'r-icon' }, cat?.icon || '🧾'),
+      h('div', { class: 'r-main clickable', style: 'cursor:pointer', onclick: () => billModal(b) },
+        h('div', { class: 'r-title' }, b.name),
+        h('div', { class: 'r-sub', style: d < 0 ? 'color:var(--neg)' : '' },
+          `${b.due ? fmtDate(b.due, true) + ' · ' : ''}${when}`)),
+      h('div', { class: 'r-amt' }, fmt(Number(b.amount) || 0)),
+      h('button', { class: 'btn btn-sm', onclick: () => payBillModal(b) }, 'Pay'));
+  })));
+  main.append(c);
+}
+
+/* ============================== wishlist ================================= */
+/* Things to buy later — the "Things to purchase" sheet.                     */
+
+function wishModal(item) {
+  const isNew = !item;
+  const d = item ? { ...item } : {
+    name: '', category: '', notes: '', link: '', price: '', priority: 'normal', bought: false,
+  };
+  const cats = [...new Set(S.wishlist.map((w) => w.category).filter(Boolean))];
+  const form = h('form', { class: 'form-grid' },
+    field('Item', h('input', { name: 'name', value: d.name, required: true, placeholder: 'e.g. Merino Wool Polo' })),
+    h('div', { class: 'two-col' },
+      field('Category', h('input', {
+        name: 'category', value: d.category || '', list: 'wish-cats', placeholder: 'e.g. Tops',
+      })),
+      field('Price (optional)', h('input', {
+        name: 'price', type: 'number', step: '0.01', min: '0', inputmode: 'decimal', value: d.price || '',
+      }))),
+    h('datalist', { id: 'wish-cats' }, ...cats.map((c) => h('option', { value: c }))),
+    field('Specifics / notes', h('input', { name: 'notes', value: d.notes || '', placeholder: 'e.g. Black, oversized' })),
+    field('Link', h('input', { name: 'link', type: 'url', value: d.link || '', placeholder: 'https://…' })),
+    field('Priority', h('select', { name: 'priority' },
+      ...[['high', 'High'], ['normal', 'Normal'], ['low', 'Someday']].map(([v, l]) =>
+        h('option', { value: v, selected: (d.priority || 'normal') === v }, l)))),
+  );
+  openModal(isNew ? 'Add to wishlist' : 'Edit item', form, {
+    onSave: async () => {
+      const fd = new FormData(form);
+      const body = {
+        name: fd.get('name'), category: fd.get('category'), notes: fd.get('notes'),
+        link: fd.get('link'), priority: fd.get('priority'),
+        price: parseFloat(fd.get('price')) || 0, bought: d.bought || false,
+      };
+      if (isNew) S.wishlist.push(await api('/api/wishlist', 'POST', body));
+      else Object.assign(item, await api('/api/wishlist/' + item.id, 'PUT', body));
+      toast('Saved');
+      render();
+    },
+    onDelete: isNew ? null : async () => {
+      await api('/api/wishlist/' + item.id, 'DELETE');
+      S.wishlist = S.wishlist.filter((x) => x.id !== item.id);
+      toast('Removed');
+      render();
+    },
+  });
+}
+
+function pageWishlist(main) {
+  setTopbar('Wishlist', [], [
+    h('button', { class: 'btn btn-primary', onclick: () => wishModal(null) },
+      h('span', { class: 'ic-wrap', html: icon('plus', 15) }), lbl('Add item')),
+  ]);
+
+  if (!S.wishlist.length) {
+    main.append(card(emptyState('🛍️',
+      'Keep a running list of things you want to buy, grouped by category, with notes and links.',
+      'Add item', () => wishModal(null))));
+    return;
+  }
+
+  const open = S.wishlist.filter((w) => !w.bought);
+  const bought = S.wishlist.filter((w) => w.bought);
+  const priced = open.filter((w) => Number(w.price) > 0);
+  main.append(h('div', { class: 'kpi-row' },
+    kpi(String(open.length), 'Items to buy'),
+    kpi(fmt(priced.reduce((s, w) => s + Number(w.price), 0)), 'Estimated cost'),
+    kpi(String(open.filter((w) => w.priority === 'high').length), 'High priority'),
+    kpi(String(bought.length), 'Bought')));
+
+  const byCat = new Map();
+  for (const w of open) {
+    const k = w.category || 'Uncategorised';
+    if (!byCat.has(k)) byCat.set(k, []);
+    byCat.get(k).push(w);
+  }
+  const PRI = { high: 0, normal: 1, low: 2 };
+  const c = card();
+  for (const [catName, items] of [...byCat.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const sum = items.reduce((s, w) => s + (Number(w.price) || 0), 0);
+    c.append(h('div', { class: 'group-head' },
+      h('span', {}, catName),
+      h('span', { class: 'gt' }, sum ? fmt(sum) : `${items.length} item${items.length === 1 ? '' : 's'}`)));
+    items.sort((a, b) => (PRI[a.priority] ?? 1) - (PRI[b.priority] ?? 1));
+    c.append(h('div', { class: 'row-list' }, ...items.map((w) => h('div', { class: 'row' },
+      h('button', {
+        class: 'wish-check', title: 'Mark as bought',
+        onclick: async () => {
+          Object.assign(w, await api('/api/wishlist/' + w.id, 'PUT', { ...w, bought: true }));
+          toast('Marked as bought');
+          render();
+        },
+      }, h('span', { class: 'ic-wrap', html: icon('check', 14) })),
+      h('div', { class: 'r-main clickable', style: 'cursor:pointer', onclick: () => wishModal(w) },
+        h('div', { class: 'r-title' },
+          w.name,
+          w.priority === 'high' ? h('span', { class: 'pill pill-hot' }, 'High') : null),
+        h('div', { class: 'r-sub' }, w.notes || '')),
+      Number(w.price) > 0 ? h('div', { class: 'r-amt' }, fmt(Number(w.price))) : null,
+      w.link ? h('a', {
+        class: 'btn btn-sm', href: w.link, target: '_blank', rel: 'noopener noreferrer',
+        onclick: (e) => e.stopPropagation(),
+      }, 'Open') : null))));
+  }
+  main.append(c);
+
+  if (bought.length) {
+    main.append(card(cardHead(null, `Bought (${bought.length})`),
+      h('div', { class: 'row-list' }, ...bought.map((w) => h('div', { class: 'row' },
+        h('span', { class: 'ic-wrap', style: 'color:var(--pos)', html: icon('check', 16) }),
+        h('div', { class: 'r-main' },
+          h('div', { class: 'r-title', style: 'color:var(--ink-3)' }, w.name),
+          h('div', { class: 'r-sub' }, [w.category, w.notes].filter(Boolean).join(' · '))),
+        h('button', {
+          class: 'btn btn-sm', onclick: async () => {
+            Object.assign(w, await api('/api/wishlist/' + w.id, 'PUT', { ...w, bought: false }));
+            render();
+          },
+        }, 'Undo'))))));
+  }
+}
+
+/* ============================== CSV import =============================== */
+
+function importModal() {
+  const state = { rows: null, analysis: null, dayFirst: false, flipSign: false, accountId: S.accounts[0]?.id || '' };
+  const body = h('div', {});
+  const form = h('form', { class: 'form-grid' }, body);
+
+  const fileInput = h('input', {
+    type: 'file', accept: '.csv,.txt,text/csv,text/plain', style: 'display:none',
+    onchange: async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const text = await f.text();
+      state.rows = parseCSV(text);
+      state.analysis = analyse(state.rows);
+      if (state.analysis) state.dayFirst = false;
+      renderStep();
+    },
+  });
+
+  function renderStep() {
+    body.innerHTML = '';
+    if (!state.analysis) {
+      body.append(
+        h('p', { style: 'color:var(--ink-2);font-size:14px;margin-bottom:14px' },
+          'Export a CSV from your bank, then pick it here. Finch works out which columns hold the date, description and amount, skips rows you already have, and guesses categories.'),
+        h('button', {
+          class: 'btn btn-primary btn-block', type: 'button', onclick: () => fileInput.click(),
+        }, 'Choose CSV file'),
+        fileInput);
+      return;
+    }
+
+    const A = state.analysis;
+    const colOptions = (sel) => [
+      h('option', { value: '-1', selected: sel === -1 }, '— none —'),
+      ...A.headers.map((hd, i) => h('option', { value: String(i), selected: sel === i }, hd || `Column ${i + 1}`)),
+    ];
+    const setMap = (key) => (e) => { A.map[key] = parseInt(e.target.value, 10); renderStep(); };
+
+    const preview = buildRows(A, {
+      dayFirst: state.dayFirst, flipSign: state.flipSign,
+      categories: S.categories, rules: S.rules, existing: S.transactions,
+    });
+    const good = preview.filter((r) => r.ok && !r.dupe);
+    const dupes = preview.filter((r) => r.ok && r.dupe).length;
+    const bad = preview.filter((r) => !r.ok).length;
+    state.preview = good;
+
+    body.append(
+      h('div', { class: 'sum-row' },
+        h('span', { class: 'k' }, `${A.body.length} rows in file`),
+        h('span', { class: 'v' }, `${good.length} to import`)),
+      h('div', { class: 'r-sub', style: 'margin-bottom:12px' },
+        `${dupes} already in Finch, ${bad} unreadable`),
+      h('div', { class: 'two-col' },
+        field('Date column', h('select', { onchange: setMap('date') }, ...colOptions(A.map.date))),
+        field('Description', h('select', { onchange: setMap('desc') }, ...colOptions(A.map.desc)))),
+      h('div', { class: 'two-col' },
+        field('Amount', h('select', { onchange: setMap('amount') }, ...colOptions(A.map.amount))),
+        field('Category (optional)', h('select', { onchange: setMap('category') }, ...colOptions(A.map.category)))),
+      A.map.amount === -1 ? h('div', { class: 'two-col' },
+        field('Money out', h('select', { onchange: setMap('debit') }, ...colOptions(A.map.debit))),
+        field('Money in', h('select', { onchange: setMap('credit') }, ...colOptions(A.map.credit)))) : null,
+      field('Import into account', h('select', {
+        onchange: (e) => { state.accountId = e.target.value; },
+      }, h('option', { value: '' }, '— none —'),
+        ...S.accounts.map((a) => h('option', { value: a.id, selected: state.accountId === a.id }, a.name)))),
+      A.ambiguousDate ? h('label', { class: 'check-line' },
+        h('input', {
+          type: 'checkbox', checked: state.dayFirst,
+          onchange: (e) => { state.dayFirst = e.target.checked; renderStep(); },
+        }), h('span', {}, 'Dates are day/month (European order)')) : null,
+      h('label', { class: 'check-line' },
+        h('input', {
+          type: 'checkbox', checked: state.flipSign,
+          onchange: (e) => { state.flipSign = e.target.checked; renderStep(); },
+        }), h('span', {}, 'Flip signs (file lists spending as positive)')),
+      h('div', { class: 'eyebrow', style: 'margin-top:6px' }, 'Preview'),
+      h('div', { class: 'import-preview' }, ...good.slice(0, 8).map((r) => {
+        const c = catById(r.category);
+        return h('div', { class: 'row' },
+          h('div', { class: 'r-icon' }, c?.icon || '💳'),
+          h('div', { class: 'r-main' },
+            h('div', { class: 'r-title' }, r.merchant || '(no description)'),
+            h('div', { class: 'r-sub' }, `${fmtDate(r.date, true)} · ${c?.name || 'Uncategorised'}`)),
+          h('div', { class: 'r-amt' + (r.amount > 0 ? ' amt-pos' : '') }, fmtSign(r.amount)));
+      }), good.length > 8 ? h('div', { class: 'r-sub', style: 'padding:8px 2px' },
+        `+ ${good.length - 8} more`) : null),
+      fileInput);
+  }
+  renderStep();
+
+  openModal('Import bank statement', form, {
+    saveLabel: 'Import',
+    onSave: async () => {
+      if (!state.preview || !state.preview.length) throw new Error('Nothing to import — check the column mapping');
+      const payload = state.preview.map((r) => ({
+        date: r.date, merchant: r.merchant, amount: r.amount,
+        category: r.category, accountId: state.accountId, notes: '',
+      }));
+      const r = await api('/api/transactions/bulk', 'POST', { transactions: payload });
+      S.transactions = r.transactions;
+      toast(`Imported ${r.added}${r.skipped ? `, skipped ${r.skipped}` : ''}`);
+      render();
+    },
+  });
+}
+
+/* ============================= quick add ================================= */
+/* Reached from the iOS home-screen shortcut and from ?add= deep links.      */
+
+function quickAdd(prefill = {}) {
+  const sign = prefill.type === 'income' ? 1 : -1;
+  const amountInput = h('input', {
+    type: 'number', step: '0.01', min: '0', inputmode: 'decimal', required: true,
+    value: prefill.amount || '', placeholder: '0.00', class: 'quick-amount', autofocus: true,
+  });
+  const merchantInput = h('input', {
+    value: prefill.merchant || '', required: true, placeholder: 'Where?', autocomplete: 'off', list: 'quick-merchants',
+  });
+  // Recent merchants make repeat entry a single tap.
+  const recent = [...new Set(S.transactions.slice(0, 200).map((t) => t.merchant).filter(Boolean))].slice(0, 20);
+
+  let cat = prefill.category || '';
+  // Reuse the category last used for this merchant.
+  const syncCat = () => {
+    const m = merchantInput.value.trim().toLowerCase();
+    if (!m) return;
+    const hit = S.transactions.find((t) => (t.merchant || '').toLowerCase() === m);
+    if (hit && hit.category) { cat = hit.category; catSelect.value = cat; }
+  };
+  merchantInput.addEventListener('change', syncCat);
+  merchantInput.addEventListener('blur', syncCat);
+
+  const cats = S.categories.filter((c) => (sign > 0 ? c.type === 'income' : c.type !== 'income'));
+  const catSelect = h('select', {},
+    h('option', { value: '' }, '— category —'),
+    ...cats.map((c) => h('option', { value: c.id, selected: cat === c.id }, `${c.icon} ${c.name}`)));
+
+  const form = h('form', { class: 'form-grid' },
+    h('div', { class: 'quick-row' },
+      h('span', { class: 'quick-sign' }, sign > 0 ? '+' : '−'),
+      amountInput),
+    merchantInput,
+    h('datalist', { id: 'quick-merchants' }, ...recent.map((m) => h('option', { value: m }))),
+    h('div', { class: 'two-col' },
+      catSelect,
+      h('select', { name: 'accountId' },
+        h('option', { value: '' }, '— account —'),
+        ...S.accounts.map((a) => h('option', { value: a.id, selected: S.accounts[0]?.id === a.id }, a.name)))),
+    h('input', { type: 'date', name: 'date', value: prefill.date || todayISO() }),
+  );
+
+  openModal(sign > 0 ? 'Quick add income' : 'Quick add expense', form, {
+    saveLabel: 'Save',
+    onSave: async () => {
+      const fd = new FormData(form);
+      const item = await api('/api/transactions', 'POST', {
+        date: fd.get('date') || todayISO(),
+        merchant: merchantInput.value,
+        amount: sign * Math.abs(parseFloat(amountInput.value) || 0),
+        category: catSelect.value,
+        accountId: fd.get('accountId'),
+        notes: '',
+      });
+      S.transactions.push(item);
+      S.transactions.sort((a, b) => b.date.localeCompare(a.date));
+      toast('Added');
+      render();
+    },
+  });
+  setTimeout(() => amountInput.focus(), 60);
+}
+
+// #/add?amount=12.5&merchant=Coffee&type=expense — used by home-screen
+// shortcuts and iOS Shortcuts automations.
+function handleQuickRoute() {
+  const hash = location.hash;
+  const qi = hash.indexOf('?');
+  if (!hash.startsWith('#/add')) return false;
+  const params = new URLSearchParams(qi > -1 ? hash.slice(qi + 1) : '');
+  const prefill = {
+    amount: params.get('amount') || '',
+    merchant: params.get('merchant') || '',
+    type: params.get('type') === 'income' ? 'income' : 'expense',
+    date: params.get('date') || todayISO(),
+  };
+  const catName = params.get('category');
+  if (catName) {
+    const c = S.categories.find((x) => x.name.toLowerCase() === catName.toLowerCase());
+    if (c) prefill.category = c.id;
+  }
+  S.route = 'dashboard';
+  S.tab = '';
+  history.replaceState(null, '', '#/dashboard');
+  render();
+  quickAdd(prefill);
+  return true;
+}

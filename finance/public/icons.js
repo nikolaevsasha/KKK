@@ -24,6 +24,7 @@ const ICON_PATHS = {
   share: '<path d="M12 15V3"/><path d="m8 7 4-4 4 4"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   refresh: '<path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 4v5h-5"/>',
+  upload: '<path d="M12 16V4"/><path d="m8 8 4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
   sankey: '<path d="M3 5v14"/><path d="M21 5v6"/><path d="M21 15v4"/><path d="M3 8c8 0 10 -1 18 -1"/><path d="M3 15c8 0 10 2 18 2"/>',
   donut: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.2"/>',

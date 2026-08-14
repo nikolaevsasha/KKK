@@ -25,14 +25,22 @@ single JSON file on your VPS. Nothing is sent anywhere else.
   - *Income*: donut by income source
 - **Cash Flow** — six months of income vs expenses, plus net savings per month
 - **Budget** — monthly limits per category, organised by category group
-- **Recurring** — detects subscriptions and fixed bills automatically (any
-  merchant seen in three or more months), with estimated monthly and yearly cost
+- **Recurring** — two tabs. *Subscriptions* is your own list (hosting, phone,
+  rent, streaming) with monthly/yearly/weekly/quarterly billing normalised to a
+  true monthly and yearly cost. *Detected* finds recurring merchants in your
+  transactions automatically (any merchant seen in three or more months) and
+  lets you promote one to a tracked subscription in a tap.
 - **Goals** — savings goals with progress bars
 - **Investments** — portfolio value over time and allocation across accounts
 - **Advice** — insights generated from your own data: savings rate, over-budget
   categories, recurring-payment load, month-over-month spending swings
+- **Left to pay** — what you still owe, by due date, with overdue and
+  due-this-week totals. Marking a bill paid can record the payment as a
+  transaction against an account in one step.
+- **Wishlist** — things to buy later, grouped by category, with notes, links,
+  optional prices and a bought/undo toggle
 - **Settings** — currency (15 supported), custom categories and groups, password
-  change, JSON export, demo data, erase-all
+  change, CSV import, JSON export, demo data, erase-all
 - **PWA** — installable on iOS/Android/desktop, works offline for the shell,
   dark mode follows the system
 
@@ -53,6 +61,74 @@ Environment variables: `PORT` (default `8484`), `HOST` (default `0.0.0.0`),
 
 The first page load asks you to create a password. Click **Load demo data** on
 the empty dashboard to explore with sample data, then erase it in Settings.
+
+## Importing data
+
+### Bank statements (CSV)
+
+**Transactions → Import CSV**, or **Settings → Import bank statement**. Export a
+CSV from your bank and pick it — Finch works out the rest:
+
+- **Column detection** for date, description, amount and category, including
+  banks that use separate *Debit* / *Credit* columns instead of one signed
+  amount, and files with no header row at all. Anything it guesses wrong you fix
+  in the dropdowns, and the preview updates live.
+- **Formats**: comma, semicolon, tab or pipe delimited; quoted fields with
+  embedded commas; `1,234.56` and `1.234,56`; `(45.00)` and `-$45` negatives;
+  ISO, `MM/DD/YYYY`, `DD.MM.YYYY` and `12 Jan 2025` dates. If day/month order is
+  genuinely ambiguous, a checkbox settles it. Another toggle handles files that
+  list spending as positive.
+- **Merchant cleanup** strips the noise banks add — `POS PURCHASE WHOLE FOODS
+  MKT 88213` becomes `Whole Foods Mkt`.
+- **Categorisation** by keyword, by any category column in the file, and by what
+  you picked for that merchant before.
+- **Duplicate-safe**: a row matching an existing date, amount and merchant is
+  skipped, so re-importing an overlapping statement adds only what is new.
+
+### A spreadsheet you already keep
+
+If you track money in Excel, `tools/import-xlsx.js` loads it directly — no
+dependencies, no converting to CSV first:
+
+```bash
+node tools/import-xlsx.js ~/Personal_Charges.xlsx --dry-run   # preview
+node tools/import-xlsx.js ~/Personal_Charges.xlsx             # import
+```
+
+It reads three sheets by name, case- and space-insensitively:
+
+| Sheet | Columns | Becomes |
+|---|---|---|
+| `Recurring` | Service, Pay, *(Frequency)* | Subscriptions |
+| `Left2Pay` | Name, Pay, Date | Left to pay |
+| `Things to purchase` | Category, Item, Notes, Link | Wishlist |
+
+Total rows (`Monthly:`, `Total:`) and formula cells are ignored, Excel serial
+dates are converted, hyperlinks are resolved to their real URLs, and categories
+are matched by name. Re-running skips anything already imported, so you can
+re-import after editing the sheet.
+
+## Quick entry on iPhone
+
+Once Finch is on your home screen, there are three fast paths:
+
+1. **Long-press the app icon** for *Add expense*, *Add income*, *Left to pay*
+   and *Wishlist*. The first two jump straight to the entry sheet with the
+   amount field focused and the number pad already up. Requires iOS 16.4+.
+2. **The + button** in the bottom-right of any screen. The sheet is one big
+   amount field, then merchant — and it remembers: type a merchant you have used
+   before and it fills in the category you gave it last time, with recent
+   merchants autocompleting.
+3. **Siri Shortcuts and automations**, by opening a URL with values filled in:
+
+   ```
+   https://YOUR-DOMAIN/#/add?type=expense&amount=12.50&merchant=Coffee&category=Coffee%20Shops
+   ```
+
+   Every parameter is optional: `type` (`expense` or `income`), `amount`,
+   `merchant`, `category` (matched by name) and `date` (`YYYY-MM-DD`). Wrap that
+   in a Shortcut and you can log a coffee by saying "Hey Siri, coffee", or put a
+   one-tap button on your Home Screen or Lock Screen.
 
 ## Deploy on a VPS
 
@@ -130,8 +206,9 @@ Settings → **Export** downloads the same data as JSON from any device.
   proxy, valid 90 days. Changing the password signs out all other devices.
 - Login attempts are rate-limited (5 failures → 60-second lockout).
 - There is no signup and no multi-user support by design — this is your server.
-- Finch never connects to a bank. You enter data yourself, so no bank
-  credentials exist to leak.
+- Finch never connects to a bank. You type entries yourself or import a CSV you
+  downloaded, so no bank credentials exist to leak. CSV parsing happens in your
+  browser; only the resulting transactions are sent to your own server.
 
 ## Layout
 
@@ -142,9 +219,11 @@ public/styles.css      Theme, layout, components, dark mode
 public/app.js          Router, pages, modals, derived data
 public/charts.js       Line/area, grouped bars, donut, sankey, sparkline
 public/icons.js        Line icon set
+public/import.js       CSV parsing, column detection, categorisation
 public/sw.js           Service worker (offline shell)
 public/manifest.webmanifest
 tools/make-icons.js    Regenerates PNG icons from the SVG mark
+tools/import-xlsx.js   Imports an .xlsx of subscriptions/bills/wishlist
 deploy/                systemd unit, nginx config, Dockerfile, compose
 ```
 
